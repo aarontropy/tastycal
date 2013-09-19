@@ -91,7 +91,8 @@ INSTALLED_APPS = (
 
     'south',
     'tastypie',
-    
+    'tastycal',
+
 )
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
