@@ -20,7 +20,7 @@ class Calendar(models.Model):
 
     '''
     title = models.CharField(_('title'), max_length=32)
-    parent_calendar = models.ForeignKey(Calendar, related_name="child_calendars")
+    parent_calendar = models.ForeignKey('self', blank=True, null=True, related_name="child_calendars")
 
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
@@ -147,11 +147,10 @@ class EventType(models.Model):
 #===============================================================================
 class Event(models.Model):
     calendar = models.ForeignKey(Calendar, related_name=_('events'))
-    rule = models.ForeignKey(EventRule, related_name=_('events'))
+    rule = models.ForeignKey(RRule, related_name=_('events'))
     event_type = models.ForeignKey(EventType, verbose_name=_('event type'))
 
     title = models.CharField(_('title'), max_length=100)
-    notes = generic.GenericRelation(Note, verbose_name=_('notes'))
     start_time = models.DateTimeField(_('start time'))
     end_time = models.DateTimeField(_('end time'))
     all_day = models.BooleanField(_('all day'))
