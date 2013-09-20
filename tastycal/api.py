@@ -44,6 +44,18 @@ class CalendarResource(ModelResource):
         collection_name = 'calendars'
         authorization = DjangoAuthorization()
 
+    def prepend_urls(self):
+        return [
+            url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/events%s$" % (self._meta.resource_name, trailing_slash()), 
+                self.wrap_view('dispatch_event_list'), 
+                name="api_dispatch_detail_events"),
+        ]
+
+    def dispatch_event_list(self, request, **kwargs):
+        event_resource = EventResource()
+        kwargs['calendar__id'] = kwargs.pop('pk')
+        return event_resource.dispatch('list', request, **kwargs)
+
 
 
 

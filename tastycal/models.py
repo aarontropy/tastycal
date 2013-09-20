@@ -22,8 +22,8 @@ class Calendar(models.Model):
     title = models.CharField(_('title'), max_length=32)
     parent_calendar = models.ForeignKey('self', blank=True, null=True, related_name="child_calendars")
 
-    content_type = models.ForeignKey(ContentType, null=True)
-    object_id = models.PositiveIntegerField(null=True)
+    content_type = models.ForeignKey(ContentType, blank=True, null=True)
+    object_id = models.PositiveIntegerField(blank=True, null=True)
     content_object = generic.GenericForeignKey('content_type', 'object_id')
 
     #===========================================================================
@@ -147,13 +147,13 @@ class EventType(models.Model):
 #===============================================================================
 class Event(models.Model):
     calendar = models.ForeignKey(Calendar, related_name=_('events'))
-    rule = models.ForeignKey(RRule, related_name=_('events'))
+    rule = models.ForeignKey(RRule, blank=True, null=True, related_name=_('events'))
     event_type = models.ForeignKey(EventType, verbose_name=_('event type'))
 
     title = models.CharField(_('title'), max_length=100)
     start_time = models.DateTimeField(_('start time'))
-    end_time = models.DateTimeField(_('end time'))
-    all_day = models.BooleanField(_('all day'))
+    end_time = models.DateTimeField(_('end time'), blank=True, null=True)
+    all_day = models.BooleanField(_('all day'), default=False)
 
 
     #===========================================================================
@@ -165,6 +165,13 @@ class Event(models.Model):
 
     def __unicode__(self):
         return u'%s: %s' % (self.title, self.start_time.isoformat())
+
+
+    def save(self, *args, **kwargs):
+        if not self.end_time:
+            self.all_day = True
+
+        super(Event, self).save(*args, **kwargs)
 
 
     @models.permalink
