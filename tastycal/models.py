@@ -22,8 +22,8 @@ class Calendar(models.Model):
     title = models.CharField(_('title'), max_length=32)
     parent_calendar = models.ForeignKey('self', blank=True, null=True, related_name="child_calendars")
 
-    content_type = models.ForeignKey(ContentType)
-    object_id = models.PositiveIntegerField()
+    content_type = models.ForeignKey(ContentType, null=True)
+    object_id = models.PositiveIntegerField(null=True)
     content_object = generic.GenericForeignKey('content_type', 'object_id')
 
     #===========================================================================
