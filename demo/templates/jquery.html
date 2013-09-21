@@ -109,23 +109,26 @@
 			},
 
 			select: function(start, end, allDay) {
+				$('#event_tite').val('Class');
 				$('#event_start').val( moment(start).format('MM/DD/YYYY h:mm a') )
 				$('#event_end').val( moment(end).format('MM/DD/YYYY h:mm a') )
-				$('#event_occurrence_id').val('');
+				$('#event_id').val('');
+				$('#event_url').val('');
 				$('#event_modal_delete').addClass("hide") 
 				$('#event_modal').modal('show');
 
 				calendar.fullCalendar('unselect');
 			},
-			eventClick: function( occurrence, jsEvent, view ) {
-				$('#event_start').val( moment(occurrence.start).format('MM/DD/YYYY h:mm a') );
-				if (occurrence.end) {
-					$('#event_end').val( moment(occurrence.end).format('MM/DD/YYYY h:mm a') );
+			eventClick: function( event, jsEvent, view ) {
+				$('#event_tite').val(event.title);
+				$('#event_start').val( moment(event.start).format('MM/DD/YYYY h:mm a') );
+				if (event.end) {
+					$('#event_end').val( moment(event.end).format('MM/DD/YYYY h:mm a') );
 				} else {
 					$('#event_end').val( "" );
 				}
-				$('#event_occurrence_id').val(occurrence.id);
-				$('#event_occurrence_uri').val(occurrence.resource_uri);
+				$('#event_id').val(event.id);
+				$('#event_uri').val(event.resource_uri);
 				$('#event_modal_delete').removeClass("hide") 
 				$('#event_modal').modal('show');
 
@@ -211,9 +214,10 @@
 				}
 				// if the id is empty, then we are adding and we should
 				// POST the data, otherwise, we are PATCHING
-				var id = $('#event_occurrence_id').val();
+				var id = $('#event_id').val();
 				if (id != "") {
 					type = "PATCH"
+					url = $('#event_uri').val();
 					data_obj.id = id;
 				}
 			}
@@ -232,9 +236,8 @@
 			}).done(function() { 
 		    	calendar.fullCalendar('refetchEvents');
 			}).fail(function(xhr, textStatus, errorThrown) { 
-				var resp = jQuery.parseJSON( xhr.responseText )
-		    	alert('Error: ' + resp.error_message + '\n\n' + resp.traceback);
-		    	console.log(xhr);
+				console.log(jQuery.parseJSON( xhr.responseText ));
+				alert('Error in saving event');
 		    }).always(function() { 
 		    	// Do something always
 		    });
@@ -314,8 +317,8 @@
 	<div class="modal-body" style="max-height: 800px;">
 		<form id="event_modal_form" class="form-horizontal">
 			<!-- SINGLE EVENT SECTION -->
-			<input type="hidden" id="event_occurrence_id" name="id" value="" />
-			<input type="hidden" id="event_occurrence_uri" name="uri" value = "" />
+			<input type="hidden" id="event_id" name="id" value="" />
+			<input type="hidden" id="event_uri" name="uri" value = "" />
 
 			<div class="control-group">
 				<label class="control-label" for="title">Title</label>
