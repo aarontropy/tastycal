@@ -99,6 +99,7 @@ class CalendarResource(ModelResource):
         rule_resource = RRuleResource()
         kwargs['calendar__id'] = kwargs.pop('pk')
         return rule_resource.dispatch('list', request, **kwargs)
+        
 
     def dehydrate(self, bundle):
         bundle.data['events_uri'] = self._build_reverse_url('api_dispatch_event_list', 

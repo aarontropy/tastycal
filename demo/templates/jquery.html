@@ -19,6 +19,16 @@
 <script src='/static/js/rrule.js'></script>
 <script>
 
+	function set_repeat_section_visibility() {
+		var is_repeat = $('#event_repeat').is(':checked')
+
+		if (is_repeat) {
+			$('#repeat_section').removeClass('hide');
+		} else {
+			$('#repeat_section').addClass('hide');
+		}
+	}
+
 	$(document).ready(function() {
 
 		//--- CALENDAR LIST  ---------------------------------------------------
@@ -115,6 +125,8 @@
 				$('#event_id').val('');
 				$('#event_url').val('');
 				$('#event_modal_delete').addClass("hide") 
+				$('#event_repeat').val(false).removeClass('disabled');
+				set_repeat_section_visibility();
 				$('#event_modal').modal('show');
 
 				calendar.fullCalendar('unselect');
@@ -129,6 +141,8 @@
 				}
 				$('#event_id').val(event.id);
 				$('#event_uri').val(event.resource_uri);
+				$('#event_repeat').val( event.rule != null )
+				set_repeat_section_visibility()
 				$('#event_modal_delete').removeClass("hide") 
 				$('#event_modal').modal('show');
 
@@ -154,6 +168,10 @@
 		});
 
 		//--- MODAL REPEAT SECTION  ------------------------------------------------
+		$('#event_repeat').on('change', function() {
+			set_repeat_section_visibility();
+		})
+
 		var repeat = false;
 		$('#repeat_collapse').on('hidden', function() {
 			repeat = false;
@@ -173,7 +191,7 @@
 
 			// If the user is creating a repeating event, then we will POST
 			// to
-			if (repeat) {
+			if ($('#event_repeat').is(':checked')) {
 				var byweekday = []
 				$('#byweekday-group .btn.active').each(function() {
 					byweekday.push( eval(this.id) );
@@ -184,11 +202,11 @@
 					start: start_time,
 					end: end_time,
 					title: title,
-					freq = eval($('#freq-group .btn.active').attr('id')),
-				    until = new Date($('#event_until').val()),
-				    count = $('#event_count').val(),
-				    wkst = RRuleWeekdayField()
-				    byweekday = byweekday,
+					freq: eval($('#freq-group .btn.active').attr('id')),
+				    until: new Date($('#event_until').val()),
+				    count: $('#event_count').val(),
+				    wkst: RRuleWeekdayField(),
+				    byweekday: byweekday,
 					calendar: calendar_current.resource_uri,
 				}
 
@@ -322,54 +340,50 @@
 				<label class="control-label" for="end">End</label>
 				<div class="controls"><input type="text" id="event_end" name="end" placeholder="Click…"/></div>
 			</div>
+			<div class="control-group">
+				<div class="controls form-inline">
+					<input type="checkbox" id="event_all_day" name="all_day" /><label for="event_all_day">All Day</label>
+					<input type="checkbox" id="event_repeat" name="repeat" /><label for="event_repeat">Repeat</label>
+				</div>
+			</div>
 
 			<!-- RECURRING EVENT SECTION -->
-			<div class="accordion-group">
-				<div class="accordion-heading">
-					<a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#repeat_collapse">
-					Repeat
-					</a>
-				</div>
-				<div id="repeat_collapse" class="accordion-body collapse">
-					<div class="accordion-inner">
-			
-						<div class="control-group">
-							<label class="control-label" for="freq">Repeat every</label>
-							<div class="controls">
-								<div id="freq-group" class="btn-group" data-toggle="buttons-radio">
-									<button type="button" id="RRule.DAILY" class="btn btn-primary">Daily</button>
-									<button type="button" id="RRule.WEEKLY" class="btn btn-primary active">Weekly</button>
-									<button type="button" id="RRule.MONTHLY" class="btn btn-primary">Monthly</button>
-								</div>
-							</div>
-						</div>
-
-						<div class="control-group">
-							<label class="control-label" for="byweekday">On days</label>
-							<div class="controls">
-								<div id="byweekday-group" class="btn-group" data-toggle="buttons-checkbox">
-									<button type="button" id="RRule.SU" class="btn btn-mini btn-primary">Sun</button>
-									<button type="button" id="RRule.MO" class="btn btn-mini btn-primary">Mon</button>
-									<button type="button" id="RRule.TU" class="btn btn-mini btn-primary">Tue</button>
-									<button type="button" id="RRule.WE" class="btn btn-mini btn-primary">Wed</button>
-									<button type="button" id="RRule.TH" class="btn btn-mini btn-primary">Thu</button>
-									<button type="button" id="RRule.FR" class="btn btn-mini btn-primary">Fri</button>
-									<button type="button" id="RRule.SA" class="btn btn-mini btn-primary">Sat</button>
-								</div>
-							</div>
-						</div>
-
-						<div class="control-group">
-							<label class="control-label" for="count">Count</label>
-							<div class="controls"><input type="text" id="event_count" name="count" placeholder="# of classes" /></div>
-						</div>
-						<div class="control-group">
-							<label class="control-label" for="until">Until</label>
-						 	<div class="controls"><input type="text" id="event_until" name="until" placeholder="Click…" /></div>
+			<div class="hide" id="repeat_section">
+				<div class="control-group">
+					<label class="control-label" for="freq">Repeat every</label>
+					<div class="controls">
+						<div id="freq-group" class="btn-group" data-toggle="buttons-radio">
+							<button type="button" id="RRule.DAILY" class="btn btn-primary">Daily</button>
+							<button type="button" id="RRule.WEEKLY" class="btn btn-primary active">Weekly</button>
+							<button type="button" id="RRule.MONTHLY" class="btn btn-primary">Monthly</button>
 						</div>
 					</div>
 				</div>
-			</div>
+
+				<div class="control-group">
+					<label class="control-label" for="byweekday">On days</label>
+					<div class="controls">
+						<div id="byweekday-group" class="btn-group" data-toggle="buttons-checkbox">
+							<button type="button" id="RRule.SU" class="btn btn-mini btn-primary">Sun</button>
+							<button type="button" id="RRule.MO" class="btn btn-mini btn-primary">Mon</button>
+							<button type="button" id="RRule.TU" class="btn btn-mini btn-primary">Tue</button>
+							<button type="button" id="RRule.WE" class="btn btn-mini btn-primary">Wed</button>
+							<button type="button" id="RRule.TH" class="btn btn-mini btn-primary">Thu</button>
+							<button type="button" id="RRule.FR" class="btn btn-mini btn-primary">Fri</button>
+							<button type="button" id="RRule.SA" class="btn btn-mini btn-primary">Sat</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="control-group">
+					<label class="control-label" for="count">Count</label>
+					<div class="controls"><input type="text" id="event_count" name="count" placeholder="# of classes" /></div>
+				</div>
+				<div class="control-group">
+					<label class="control-label" for="until">Until</label>
+				 	<div class="controls"><input type="text" id="event_until" name="until" placeholder="Click…" /></div>
+				</div>
+			</div> <!-- end of accordion -->
 		</form>
 
 
