@@ -15,7 +15,7 @@ from models import Calendar, Event, RRule
 #===============================================================================
 class EventResource(ModelResource):
     calendar = fields.ForeignKey('tastycal.api.CalendarResource', 'calendar')
-    rule = fields.ForeignKey('tastycal.api.RRuleResource', 'rule', null=True)
+    rule = fields.ForeignKey('tastycal.api.RRuleResource', 'rule', null=True, full=True)
 
     #===========================================================================
     class Meta:
@@ -28,6 +28,7 @@ class EventResource(ModelResource):
             'start': ALL,
             'end': ALL,
         }
+
 
     def build_filters(self, filters=None): 
         '''
@@ -67,6 +68,7 @@ class RRuleResource(ModelResource):
 #===============================================================================
 class CalendarResource(ModelResource):
     events = fields.ToManyField(EventResource, 'events')
+    rules = fields.ToManyField(RRuleResource, 'rules')
 
     #===========================================================================
     class Meta:

@@ -10,7 +10,7 @@ from django.conf import settings
 
 from dateutil import rrule
 
-from fields import RRuleWeekdayField, RRuleWeekdayListField
+from fields import RRuleWeekdayListField
 
 
 #===============================================================================
@@ -62,19 +62,28 @@ class RRule(models.Model):
     capable of generating a set of events
 
     '''
+    WEEKDAYS = (
+        (0,'MO'),
+        (1,'TU'),
+        (2,'WE'),
+        (3,'TH'),
+        (4,'FR'),
+        (5,'SA'),
+        (6,'SU'),
+    )
     calendar = models.ForeignKey(Calendar, related_name="rules")
 
     title = models.CharField(_('title'), max_length=100)
     start = models.DateTimeField(_('start time'))
-    end = models.DateTimeField(_('end time'), null=True)
+    end = models.DateTimeField(_('end time'), null=True, blank=True)
     all_day = models.BooleanField(_('all day'), default=False)
 
-    freq = models.PositiveIntegerField(default=rrule.WEEKLY)
-    until = models.DateTimeField()
-    count = models.PositiveIntegerField()
-    interval = models.PositiveIntegerField()
-    wkst = RRuleWeekdayField()
-    byweekday = RRuleWeekdayListField()
+    freq = models.PositiveIntegerField(default=rrule.WEEKLY, blank=True)
+    until = models.DateTimeField(blank=True, null=True)
+    count = models.PositiveIntegerField(blank=True)
+    interval = models.PositiveIntegerField(default=1)
+    wkst = models.PositiveIntegerField(choices=WEEKDAYS, default=0)
+    byweekday = RRuleWeekdayListField(blank=True)
 
 
     #===========================================================================
@@ -86,15 +95,28 @@ class RRule(models.Model):
     def __unicode__(self):
         return "Event rule for %s" % self.calendar.title
 
+    def save(self, *args, **kwargs):
+        """
+        First saves normally 
+        Then deletes all events related to this rule
+        Then generates a new set of events
+        
+        """
+        super(RRule, self).save(*args, **kwargs)
+
+        for ev in self.events.all():
+            ev.delete()
+
+        self.generate_events();
+
 
     def generate_events(self):
         '''
-        Creates a set of events based on the options stored
-        Deletes previously-created child events and replaces with newly-created 
-        ones, event if the old events have been edited.
+        Creates a set of events based on the model's rrule options
 
         '''
         rrule_params = model_to_dict(self, fields=['freq','until','count','interval','wkst','byweekday']) 
+        rrule_params['wkst'] = rrule.weekday(rrule_params['wkst'])
 
         if not rrule_params['count'] and not rrule_params['until']:
             rrule_params['count'] = 1
@@ -105,14 +127,6 @@ class RRule(models.Model):
                 delta = 0
 
             evs = rrule.rrule(dtstart=self.start, **rrule_params)
-            if len(evs) > 0:
-                # Since we've successfully created a list of events from our
-                # rrule params, delete existing events linked to this rule.
-                # This removes all edits a user has made, so this is not
-                # ideal.
-                for evo in self.events:
-                    evo.delete()
-
             for ev in evs:
                 self.events.create(
                     start=ev, 

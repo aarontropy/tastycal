@@ -174,35 +174,25 @@
 			// If the user is creating a repeating event, then we will POST
 			// to
 			if (repeat) {
-				var objects = []
-				var duration = end_time.getTime() - start_time.getTime();
-				var freq = eval($('#freq-group .btn.active').attr('id'))
 				var byweekday = []
 				$('#byweekday-group .btn.active').each(function() {
 					byweekday.push( eval(this.id) );
 				})
 
-				// The RRule class will generate an array of starttimes according
-				// to the options given.  RRule is a partial port of python-dateutil
-				var rule = new RRule({
-					dtstart: start_time,
-					freq: freq,
-					byweekday: byweekday,
-					count: $('#event_count').val(),
-					until: new Date($('#event_until').val())
-				})
-
-				var dates = rule.all();
-				for (var i=0; i < dates.length; i++) {
-					objects.push({
-						start_time: dates[i],
-						end_time: new Date( dates[i].getTime() + duration),
-						event: cal_data.default_cal.event_uri
-					});
+				url = calendar_current.rules_uri;
+				data_obj =  {
+					start: start_time,
+					end: end_time,
+					title: title,
+					freq = eval($('#freq-group .btn.active').attr('id')),
+				    until = new Date($('#event_until').val()),
+				    count = $('#event_count').val(),
+				    wkst = RRuleWeekdayField()
+				    byweekday = byweekday,
+					calendar: calendar_current.resource_uri,
 				}
-				data_obj.events = objects;
-				data_obj.deleted_objects = [];
-				type = "PATCH";
+
+
 
 			} else {
 				url = calendar_current.events_uri;
