@@ -6,7 +6,7 @@ from django.conf import settings
 # Import the API
 from tastypie.api import Api
 from api import CalendarResource, RRuleResource, EventResource
-v1_api = Api(api_name='api')
+v1_api = Api(api_name='v1')
 v1_api.register(CalendarResource())
 v1_api.register(EventResource())
 v1_api.register(RRuleResource())

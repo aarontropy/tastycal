@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link href='http://cdnjs.cloudflare.com/ajax/libs/fullcalendar/1.6.4/fullcalendar.css' rel='stylesheet' />
+<link href='http://cdnjs.cloudflare.com/ajax/libs/fullcalendar/1.6.4/fullcalendar.print.css' rel='stylesheet' media='print' />
+<link href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet" type="text/css" />
+<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.0/themes/base/jquery-ui.css" rel="stylesheet" type="text/css" />
+<link href="/static/css/bootstrap-switch.css" rel="stylesheet" type="text/css" />
+
+
+<script src='http://code.jquery.com/jquery-1.9.1.js'></script>
+<script src='http://code.jquery.com/ui/1.10.3/jquery-ui.js'></script>
+<script src='http://cdnjs.cloudflare.com/ajax/libs/fullcalendar/1.6.4/fullcalendar.min.js'></script>
+<script src='http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js'></script>
+<script src='/static/js/jquery-ui-timepicker-addon.js'></script>
+<script src='/static/js/bootstrap-switch.min.js'></script>
+<script src='/static/js/moment.min.js'></script>
+<script src='/static/js/underscore-min.js'></script>
+<script src='/static/js/rrule.js'></script>
+<script>
+
+	$(document).ready(function() {
+
+		//--- CALENDAR LIST  ---------------------------------------------------
+		var calendar_list = []
+		var calendar_current = {}
+		$.ajax({
+			url: "{% url 'api_dispatch_list' resource_name='calendar' api_name='v1' %}",
+			type: "GET",
+			contentType: 'application/json'
+		})
+		.done(function(data) {
+			calendar_list = data.calendars;
+			var cal_select = $('#calendar_list');
+			cal_select.empty();
+			cal_select.append(new Option('-- Select Calendar --', '', true, true));
+
+			$.each(data.calendars, function(index, cal) {
+				cal_select.append( new Option(cal.title, index))
+			})
+		})
+
+		$('#calendar_list').on('change', function(ev) {
+			val = $(this).val();
+			if ($.isNumeric( val )) {
+				if (calendar_current.hasOwnProperty('events_uri') ) {
+					// alert("Removing " + calendar_current.events_uri);
+					calendar.fullCalendar('removeEventSource', calendar_current.events_uri );
+				}
+
+				calendar_current = calendar_list[val];
+				var eventSource = {
+					url: calendar_current.events_uri
+				}
+
+				calendar.fullCalendar('addEventSource', eventSource);
+				calendar.fullCalendar('removeEvents');
+				calendar.fullCalendar('refetchEvents');
+			}
+
+		});
+
+
+		var cal_data = {
+			occurrence_list_uri: '/api/v1/occurrence/',
+			default_cal: {
+				occurrence_list_uri: '/api/v1/event/1/occurrences/',
+				event_uri: '/api/v1/event/1/',
+				event_id: 1
+			}
+		};
+	
+		var calendar = $('#calendar').fullCalendar({
+		
+			editable: true,
+			selectable: true,
+			selectHelper: true,
+
+			// Two things:
+			// 1)	Tastypie defaults to <field>__exact=<value> when only the field
+			//  	name is passed. Adding the type of filter prevents this.
+			// 2)	We want all events where start is shown in this view, so change
+			//		the endParam to 'start' as well
+			startParam: 'start__gte',
+			endParam: 'start__lte',
+
+			eventSources: [],
+			
+			eventDrop: function(occurrence, dayDelta, minuteDelta, allDay, revertFunc, jsEvent) {
+				var minutesDiff = (dayDelta * 60 * 24) + minuteDelta
+				var data = JSON.stringify({
+				    "start_time": occurrence.start, //new Date(event.start.getTime() + (minutesDiff * 60000)),
+				    "end_time": occurrence.end, //new Date(event.end.getTime() + (minutesDiff * 60000)),
+				    "id": occurrence.id
+				});
+
+				$.ajax({
+					url: occurrence.resource_uri,
+					type: 'PATCH',
+					contentType: 'application/json',
+					data: data,
+					dataType: 'text',
+					processData: false
+				})
+				.done(function() { })
+			    .fail(function(xhr, textStatus, errorThrown) { 
+			    	alert("There was a problem on the server...wonder what it was...");
+			    }).always(function() { });
+			},
+
+			select: function(start, end, allDay) {
+				$('#event_start').val( moment(start).format('MM/DD/YYYY h:mm a') )
+				$('#event_end').val( moment(end).format('MM/DD/YYYY h:mm a') )
+				$('#event_occurrence_id').val('');
+				$('#event_modal_delete').addClass("hide") 
+				$('#event_modal').modal('show');
+
+				calendar.fullCalendar('unselect');
+			},
+			eventClick: function( occurrence, jsEvent, view ) {
+				$('#event_start').val( moment(occurrence.start).format('MM/DD/YYYY h:mm a') );
+				if (occurrence.end) {
+					$('#event_end').val( moment(occurrence.end).format('MM/DD/YYYY h:mm a') );
+				} else {
+					$('#event_end').val( "" );
+				}
+				$('#event_occurrence_id').val(occurrence.id);
+				$('#event_occurrence_uri').val(occurrence.resource_uri);
+				$('#event_modal_delete').removeClass("hide") 
+				$('#event_modal').modal('show');
+
+			},
+
+			
+			loading: function(bool) {
+				if (bool) $('#loading').show();
+				else $('#loading').hide();
+			},
+			eventDataTransform: function( eventData ) {
+				return eventData;
+			}
+
+			
+		});
+
+		//--- MODAL  -----------------------------------------------------------
+		$('#event_modal').modal({ 
+			show: false,
+			keyboard: true,
+
+		});
+
+		//--- MODAL REPEAT SECTION  ------------------------------------------------
+		var repeat = false;
+		$('#repeat_collapse').on('hidden', function() {
+			repeat = false;
+		}).on('shown', function() {
+			repeat = true;
+		});
+
+
+		//--- MODAL SAVE BUTTON  ------------------------------------------------
+		$('#event_modal_save').on('click', function(e){
+			var start_time = new Date($('#event_start').val())
+			var end_time = new Date($('#event_end').val())
+			var title = $('#event_title').val();
+			var type = "POST";
+			var url = "";
+			var data_obj = {};
+
+			// If the user is creating a repeating event, then we will POST
+			// to
+			if (repeat) {
+				var objects = []
+				var duration = end_time.getTime() - start_time.getTime();
+				var freq = eval($('#freq-group .btn.active').attr('id'))
+				var byweekday = []
+				$('#byweekday-group .btn.active').each(function() {
+					byweekday.push( eval(this.id) );
+				})
+
+				// The RRule class will generate an array of starttimes according
+				// to the options given.  RRule is a partial port of python-dateutil
+				var rule = new RRule({
+					dtstart: start_time,
+					freq: freq,
+					byweekday: byweekday,
+					count: $('#event_count').val(),
+					until: new Date($('#event_until').val())
+				})
+
+				var dates = rule.all();
+				for (var i=0; i < dates.length; i++) {
+					objects.push({
+						start_time: dates[i],
+						end_time: new Date( dates[i].getTime() + duration),
+						event: cal_data.default_cal.event_uri
+					});
+				}
+				data_obj.events = objects;
+				data_obj.deleted_objects = [];
+				type = "PATCH";
+
+			} else {
+				url = calendar_current.events_uri;
+				data_obj = {
+					start: start_time,
+					end: end_time,
+					title: title,
+					calendar: calendar_current.resource_uri,
+				}
+				// if the id is empty, then we are adding and we should
+				// POST the data, otherwise, we are PATCHING
+				var id = $('#event_occurrence_id').val();
+				if (id != "") {
+					type = "PATCH"
+					data_obj.id = id;
+				}
+			}
+
+			var data = JSON.stringify(data_obj);
+
+
+			$.ajax({
+				url: url,
+				type: type,
+				contentType: 'application/json',
+				data: data,
+				dataType: 'text',
+				processData: true
+
+			}).done(function() { 
+		    	calendar.fullCalendar('refetchEvents');
+			}).fail(function(xhr, textStatus, errorThrown) { 
+				var resp = jQuery.parseJSON( xhr.responseText )
+		    	alert('Error: ' + resp.error_message + '\n\n' + resp.traceback);
+		    	console.log(xhr);
+		    }).always(function() { 
+		    	// Do something always
+		    });
+	    	$('#event_modal').modal('hide')
+	    });
+
+		$('#event_modal_delete').on('click', function(e) {
+			$.ajax({
+				url: $('#event_occurrence_uri').val(),
+				type: 'DELETE',
+				contentType: 'application/json',
+				dataType: 'text',
+				processData: true
+
+			}).done(function() { 
+		    	calendar.fullCalendar('refetchEvents');
+			}).fail(function(xhr, textStatus, errorThrown) { 
+		    	alert("There was a problem on the server...wonder what it was...");
+		    	console.log(xhr);
+		    }).always(function() { 
+		    	// Do something always
+		    });
+	    	$('#event_modal').modal('hide')
+		    calendar.fullCalendar('refetchEvents');
+		})
+
+		//--- DATE/TIME PICKER ------------------------------------
+		$('#event_start, #event_end, #event_until').datetimepicker({
+	      timeFormat: 'hh:mm tt',
+	      stepMinute: 15,
+	    });
+		
+	});
+
+</script>
+<style>
+
+	body {
+		margin-top: 40px;
+		font-size: 14px;
+		font-family: "Lucida Grande",Helvetica,Arial,Verdana,sans-serif;
+		}
+		
+	#calendar_container {
+		text-align: center;
+		}
+
+	#loading {
+		position: absolute;
+		top: 5px;
+		right: 5px;
+		}
+
+	#calendar {
+		width: 900px;
+		margin: 0 auto;
+		}
+
+</style>
+</head>
+<body>
+	<select id="calendar_list"></select>
+	<ul>
+		<li><a href="{% url 'api_dispatch_list' resource_name='calendar' api_name='v1' %}">Calendar API</a></li>
+	</ul>
+
+	<div id="calendar_container">
+		<div id='loading' style='display:none'>loading...</div>
+		<div id='calendar'></div>
+	</div>
+
+<div id="event_modal" class="modal hide fade">
+	<div class="modal-header">
+		<button type="button" class="close" data-dismiss="modal">×</button>
+		<h3 id="event_modal_header">New Event</h3>
+	</div>
+	<div class="modal-body" style="max-height: 800px;">
+		<form id="event_modal_form" class="form-horizontal">
+			<!-- SINGLE EVENT SECTION -->
+			<input type="hidden" id="event_occurrence_id" name="id" value="" />
+			<input type="hidden" id="event_occurrence_uri" name="uri" value = "" />
+
+			<div class="control-group">
+				<label class="control-label" for="title">Title</label>
+				<div class="controls"><input type="text" id="event_title" name="start" value="Class" /></div>
+			</div>
+			<div class="control-group">
+				<label class="control-label" for="start">Start</label>
+				<div class="controls"><input type="text" id="event_start" name="start" placeholder="Click…" /></div>
+			</div>
+			<div class="control-group">
+				<label class="control-label" for="end">End</label>
+				<div class="controls"><input type="text" id="event_end" name="end" placeholder="Click…"/></div>
+			</div>
+
+			<!-- RECURRING EVENT SECTION -->
+			<div class="accordion-group">
+				<div class="accordion-heading">
+					<a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#repeat_collapse">
+					Repeat
+					</a>
+				</div>
+				<div id="repeat_collapse" class="accordion-body collapse">
+					<div class="accordion-inner">
+			
+						<div class="control-group">
+							<label class="control-label" for="freq">Repeat every</label>
+							<div class="controls">
+								<div id="freq-group" class="btn-group" data-toggle="buttons-radio">
+									<button type="button" id="RRule.DAILY" class="btn btn-primary">Daily</button>
+									<button type="button" id="RRule.WEEKLY" class="btn btn-primary active">Weekly</button>
+									<button type="button" id="RRule.MONTHLY" class="btn btn-primary">Monthly</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="control-group">
+							<label class="control-label" for="byweekday">On days</label>
+							<div class="controls">
+								<div id="byweekday-group" class="btn-group" data-toggle="buttons-checkbox">
+									<button type="button" id="RRule.SU" class="btn btn-mini btn-primary">Sun</button>
+									<button type="button" id="RRule.MO" class="btn btn-mini btn-primary">Mon</button>
+									<button type="button" id="RRule.TU" class="btn btn-mini btn-primary">Tue</button>
+									<button type="button" id="RRule.WE" class="btn btn-mini btn-primary">Wed</button>
+									<button type="button" id="RRule.TH" class="btn btn-mini btn-primary">Thu</button>
+									<button type="button" id="RRule.FR" class="btn btn-mini btn-primary">Fri</button>
+									<button type="button" id="RRule.SA" class="btn btn-mini btn-primary">Sat</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="control-group">
+							<label class="control-label" for="count">Count</label>
+							<div class="controls"><input type="text" id="event_count" name="count" placeholder="# of classes" /></div>
+						</div>
+						<div class="control-group">
+							<label class="control-label" for="until">Until</label>
+						 	<div class="controls"><input type="text" id="event_until" name="until" placeholder="Click…" /></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</form>
+
+
+	<div class="modal-footer">
+	    <button class="btn" data-dismiss="modal">Close</button>
+	    <button class="btn btn-primary" id="event_modal_save">Save changes</button>
+	    <button class="btn btn-danger hide" id="event_modal_delete">Delete</button>
+	</div>
+</div>
+
+
+</body>
+</html>

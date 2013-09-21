@@ -1,10 +1,12 @@
-from tastypie.resources import ModelResource
+from tastypie.resources import ModelResource, ALL_WITH_RELATIONS, ALL
 from tastypie import fields
 from tastypie.utils import trailing_slash
 from tastypie.authorization import DjangoAuthorization
 from django.conf.urls import url
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import json
+import pytz
+from datetime import datetime
 
 from models import Calendar, Event, RRule
 
@@ -12,6 +14,8 @@ from models import Calendar, Event, RRule
 
 #===============================================================================
 class EventResource(ModelResource):
+    calendar = fields.ForeignKey('tastycal.api.CalendarResource', 'calendar')
+    rule = fields.ForeignKey('tastycal.api.RRuleResource', 'rule', null=True)
 
     #===========================================================================
     class Meta:
@@ -19,6 +23,33 @@ class EventResource(ModelResource):
         resource_name = 'event'
         collection_name = 'events'
         authorization = DjangoAuthorization()
+        filtering = {
+            'calendar': ALL_WITH_RELATIONS,
+            'start': ALL,
+            'end': ALL,
+        }
+
+    def build_filters(self, filters=None): 
+        '''
+        Currently, some clients (OK, arshaw's FullCalendar) send time 
+        ranges as timestamps.  tastypie reuires ISO-8601 format 
+        out-of-the-box.
+        FullCalendar may soon change the way it sends time ranges
+        (see https://gist.github.com/arshaw/6420506), but until then,
+        we have to do the work ourselves.
+
+        '''
+        if filters is None: 
+            filters = {} 
+
+        orm_filters = super(EventResource, self).build_filters(filters) 
+        if 'start__gte' in orm_filters and orm_filters['start__gte'].isnumeric(): 
+            orm_filters['start__gte'] = pytz.UTC.localize(datetime.utcfromtimestamp(float(orm_filters['start__gte'])) )
+        if 'start__lte' in orm_filters and orm_filters['start__lte'].isnumeric(): 
+            orm_filters['start__lte'] = pytz.UTC.localize(datetime.utcfromtimestamp(float(orm_filters['start__lte'])) )
+
+        return orm_filters 
+
 
 #===============================================================================
 class RRuleResource(ModelResource):
@@ -43,18 +74,36 @@ class CalendarResource(ModelResource):
         resource_name = 'calendar'
         collection_name = 'calendars'
         authorization = DjangoAuthorization()
+        filtering = {
+            'id': ALL,
+        }
 
     def prepend_urls(self):
         return [
             url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/events%s$" % (self._meta.resource_name, trailing_slash()), 
                 self.wrap_view('dispatch_event_list'), 
-                name="api_dispatch_detail_events"),
+                name="api_dispatch_event_list"),
+            url(r"^(?P<resource_name>%s)/(?P<pk>\w+)/rules%s$" % (self._meta.resource_name, trailing_slash()), 
+                self.wrap_view('dispatch_rule_list'), 
+                name="api_dispatch_rule_list"),
         ]
 
     def dispatch_event_list(self, request, **kwargs):
         event_resource = EventResource()
         kwargs['calendar__id'] = kwargs.pop('pk')
         return event_resource.dispatch('list', request, **kwargs)
+
+    def dispatch_rule_list(self, request, **kwargs):
+        rule_resource = RRuleResource()
+        kwargs['calendar__id'] = kwargs.pop('pk')
+        return rule_resource.dispatch('list', request, **kwargs)
+
+    def dehydrate(self, bundle):
+        bundle.data['events_uri'] = self._build_reverse_url('api_dispatch_event_list', 
+            kwargs=self.resource_uri_kwargs(bundle))
+        bundle.data['rules_uri'] = self._build_reverse_url('api_dispatch_rule_list', 
+            kwargs=self.resource_uri_kwargs(bundle))
+        return bundle
 
 
 

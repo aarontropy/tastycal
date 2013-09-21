@@ -41,7 +41,7 @@ class Calendar(models.Model):
         Return all occurrences that are set to start on or after the current
         time.
         '''
-        return self.events.filter(start_time__gte=datetime.now())
+        return self.events.filter(start__gte=datetime.now())
 
 
     def next_event(self):
@@ -65,8 +65,8 @@ class RRule(models.Model):
     calendar = models.ForeignKey(Calendar, related_name="rules")
 
     title = models.CharField(_('title'), max_length=100)
-    start_time = models.DateTimeField(_('start time'))
-    end_time = models.DateTimeField(_('end time'), null=True)
+    start = models.DateTimeField(_('start time'))
+    end = models.DateTimeField(_('end time'), null=True)
     all_day = models.BooleanField(_('all day'), default=False)
 
     freq = models.PositiveIntegerField(default=rrule.WEEKLY)
@@ -99,12 +99,12 @@ class RRule(models.Model):
         if not rrule_params['count'] and not rrule_params['until']:
             rrule_params['count'] = 1
         else:
-            if not self.all_day and self.end_time is not None:
-                delta = self.end_time - self.start_time
+            if not self.all_day and self.end is not None:
+                delta = self.end - self.start
             else:
                 delta = 0
 
-            evs = rrule.rrule(dtstart=self.start_time, **rrule_params)
+            evs = rrule.rrule(dtstart=self.start, **rrule_params)
             if len(evs) > 0:
                 # Since we've successfully created a list of events from our
                 # rrule params, delete existing events linked to this rule.
@@ -115,8 +115,8 @@ class RRule(models.Model):
 
             for ev in evs:
                 self.events.create(
-                    start_time=ev, 
-                    end_time=ev + delta if self.end_time is not None else None,
+                    start=ev, 
+                    end=ev + delta if self.end is not None else None,
                     all_day=self.all_day,
                     title=self.title,
                     calendar=self.calendar,
@@ -148,11 +148,11 @@ class EventType(models.Model):
 class Event(models.Model):
     calendar = models.ForeignKey(Calendar, related_name=_('events'))
     rule = models.ForeignKey(RRule, blank=True, null=True, related_name=_('events'))
-    event_type = models.ForeignKey(EventType, verbose_name=_('event type'))
+    event_type = models.ForeignKey(EventType, verbose_name=_('event type'), null=True, blank=True)
 
     title = models.CharField(_('title'), max_length=100)
-    start_time = models.DateTimeField(_('start time'))
-    end_time = models.DateTimeField(_('end time'), blank=True, null=True)
+    start = models.DateTimeField(_('start time'))
+    end = models.DateTimeField(_('end time'), blank=True, null=True)
     all_day = models.BooleanField(_('all day'), default=False)
 
 
@@ -160,15 +160,15 @@ class Event(models.Model):
     class Meta:
         verbose_name = _('event')
         verbose_name_plural = _('events')
-        ordering = ('start_time', 'end_time', 'title')
+        ordering = ('start', 'end', 'title')
 
 
     def __unicode__(self):
-        return u'%s: %s' % (self.title, self.start_time.isoformat())
+        return u'%s: %s' % (self.title, self.start.isoformat())
 
 
     def save(self, *args, **kwargs):
-        if not self.end_time:
+        if not self.end:
             self.all_day = True
 
         super(Event, self).save(*args, **kwargs)
@@ -180,5 +180,5 @@ class Event(models.Model):
 
 
     def __cmp__(self, other):
-        return cmp(self.start_time, other.start_time)
+        return cmp(self.start, other.start)
 
