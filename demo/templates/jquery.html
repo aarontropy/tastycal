@@ -86,16 +86,16 @@
 
 			eventSources: [],
 			
-			eventDrop: function(occurrence, dayDelta, minuteDelta, allDay, revertFunc, jsEvent) {
+			eventDrop: function(event, dayDelta, minuteDelta, allDay, revertFunc, jsEvent) {
 				var minutesDiff = (dayDelta * 60 * 24) + minuteDelta
 				var data = JSON.stringify({
-				    "start_time": occurrence.start, //new Date(event.start.getTime() + (minutesDiff * 60000)),
-				    "end_time": occurrence.end, //new Date(event.end.getTime() + (minutesDiff * 60000)),
-				    "id": occurrence.id
+				    "start": event.start, //new Date(event.start.getTime() + (minutesDiff * 60000)),
+				    "end": event.end, //new Date(event.end.getTime() + (minutesDiff * 60000)),
+				    "id": event.id
 				});
 
 				$.ajax({
-					url: occurrence.resource_uri,
+					url: event.resource_uri,
 					type: 'PATCH',
 					contentType: 'application/json',
 					data: data,
