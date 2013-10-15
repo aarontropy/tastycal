@@ -54,6 +54,13 @@ class Calendar(models.Model):
 
 
 
+#===============================================================================
+class RRuleManager(models.Manager):
+    def split_rule(split_rule, with_rule, on_date):
+        '''
+        '''
+        pass
+
 
 #===============================================================================
 class RRule(models.Model):
@@ -95,11 +102,12 @@ class RRule(models.Model):
     def __unicode__(self):
         return "Event rule for %s" % self.calendar.title
 
+
     def save(self, *args, **kwargs):
         """
-        First saves normally 
-        Then deletes all events related to this rule
-        Then generates a new set of events
+        Save normally
+        Delete all events related to this rule
+        Generate a new set of events
         
         """
         super(RRule, self).save(*args, **kwargs)
@@ -109,6 +117,15 @@ class RRule(models.Model):
 
         self.generate_events();
 
+
+    def delete(self, *args, **kwargs):
+        """
+        deletes all events related to this rule
+        deletes rule normally
+        """
+        for ev in self.events.all():
+            ev.delete()
+        super(RRule, self).delete(*args, **kwargs)
 
     def generate_events(self):
         '''
