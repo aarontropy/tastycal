@@ -103,20 +103,6 @@ class RRule(models.Model):
         return "Event rule for %s" % self.calendar.title
 
 
-    def save(self, *args, **kwargs):
-        """
-        Save normally
-        Delete all events related to this rule
-        Generate a new set of events
-        
-        """
-        super(RRule, self).save(*args, **kwargs)
-
-        for ev in self.events.all():
-            ev.delete()
-
-        self.generate_events();
-
 
     def delete(self, *args, **kwargs):
         """
@@ -132,6 +118,9 @@ class RRule(models.Model):
         Creates a set of events based on the model's rrule options
 
         '''
+        for ev in self.events.all():
+            ev.delete()
+
         rrule_params = model_to_dict(self, fields=['freq','until','count','interval','wkst','byweekday']) 
         rrule_params['wkst'] = rrule.weekday(rrule_params['wkst'])
 
@@ -143,16 +132,23 @@ class RRule(models.Model):
             else:
                 delta = 0
 
+            print "saving id: %d" % self.id
+
             evs = rrule.rrule(dtstart=self.start, **rrule_params)
             for ev in evs:
-                self.events.create(
-                    start=ev, 
-                    end=ev + delta if self.end is not None else None,
-                    all_day=self.all_day,
-                    title=self.title,
-                    calendar=self.calendar,
-                )
+                e = Event()
+                e.start = ev
+                e.end = ev + delta if self.end is not None else None
+                e.all_day = self.all_day
+                e.title = self.title
+                e.calendar = self.calendar
+                e.rule = self
+                e.save()
 
+            print "COunt from save for %d: %d" % (self.id, len(self.events.order_by('start')) )
+
+
+                
 
 
 #===============================================================================

@@ -266,7 +266,7 @@
 				calendar: calendar_current.resource_uri,
 				freq: freqs.indexOf($('#freq-group .btn.active').attr('id')),
 			    until: new Date($('#event_until').val()),
-			    count: $('#event_count').val(),
+			    count: parseInt($('#event_count').val()),
 			    byweekday: byweekday,
 			}
 			data = JSON.stringify(data_obj);

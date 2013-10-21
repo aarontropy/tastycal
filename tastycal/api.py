@@ -71,8 +71,8 @@ class EventResource(ModelResource):
             bundle = rule_resource.full_hydrate(bundle)
             rule_resource.save(bundle)
 
-            rule_id = bundle.obj.id
-            bundle.obj = Event.objects.get(rule__id=rule_id).order_by('start')[0]
+            bundle.obj.generate_events()
+            bundle.obj = bundle.obj.events.all().order_by('start')[0]
         else:
             bundle.obj = self._meta.object_class()
             for key, value in kwargs.items():
@@ -142,7 +142,7 @@ class EventResource(ModelResource):
 #===============================================================================
 class RRuleResource(ModelResource):
     calendar = fields.ForeignKey('tastycal.api.CalendarResource', 'calendar')
-    events = fields.ToManyField(EventResource, 'events')
+    events = fields.ToManyField(EventResource, 'events', null=True)
 
     #===========================================================================
     class Meta:
