@@ -123,6 +123,8 @@ class RRule(models.Model):
 
         rrule_params = model_to_dict(self, fields=['freq','until','count','interval','wkst','byweekday']) 
         rrule_params['wkst'] = rrule.weekday(rrule_params['wkst'])
+        if len(self.byweekday) == 0:
+            rrule_params.pop('byweekday')
 
         if not rrule_params['count'] and not rrule_params['until']:
             rrule_params['count'] = 1
@@ -132,8 +134,7 @@ class RRule(models.Model):
             else:
                 delta = 0
 
-            print "saving id: %d" % self.id
-
+            print rrule_params
             evs = rrule.rrule(dtstart=self.start, **rrule_params)
             for ev in evs:
                 e = Event()
@@ -145,7 +146,6 @@ class RRule(models.Model):
                 e.rule = self
                 e.save()
 
-            print "COunt from save for %d: %d" % (self.id, len(self.events.order_by('start')) )
 
 
                 
@@ -199,6 +199,17 @@ class Event(models.Model):
             self.all_day = True
 
         super(Event, self).save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # if this is the last event connected to a rule, delete the rule
+        print "DELETE"
+        print self.rule
+        print len(self.rule.events.all())
+        if self.rule is not None and len(self.rule.events.all())==1:
+            self.rule.delete()
+            self.rule = None
+
+        super(Event, self).delete(*args, **kwargs)
 
 
     @models.permalink
