@@ -19,7 +19,7 @@ Delete non-repeating event
 	1. DELETE to Event resource
 	2. GET event list from Event resource
 Delete repeating event
-	1. DELETE to RRile resource
+	1. DELETE to RRule resource
 	2. GET event list from Event resource
 */
 
@@ -79,7 +79,6 @@ $(document).ready(function() {
 				type = "PATCH";
 			}
 			
-			console.log(data_obj);
 			$.ajax({
 				url: url,
 				type: type,

@@ -43,6 +43,12 @@ class EventResource(ModelResource):
             data['calendar'] = self.parent_calendar
         return data
 
+    def dehydrate(self, bundle):
+        # Add a repeat flag, makes life easier on the client side
+        bundle.data['repeat'] = bundle.obj.rule is not None
+        bundle.data['allDay'] = bundle.data.pop('all_day')
+        return bundle
+
     def build_filters(self, filters=None): 
         '''
         Currently, some clients (like arshaw's FullCalendar) send time 
@@ -134,13 +140,18 @@ class RRuleResource(ModelResource):
         authorization = DjangoAuthorization()
 
 
+    def alter_deserialized_detail_data(self, request, data):
+        if getattr(self, 'parent_calendar', None):
+            data['calendar'] = self.parent_calendar
+        return data
+
     def obj_create(self, bundle, request=None, **kwargs):
         """
         Repeating events are persisted as soon as the rule is created
         so, in addition to creating the event, the resource must generate
         a list of events associated with the rule.
         """
-        bundle = super(RRuleResource, self).obj_create(bundle, request, **kwargs)
+        bundle = super(RRuleResource, self).obj_create(bundle, **kwargs)
         bundle.obj.generate_events()
         return bundle
 
@@ -180,8 +191,11 @@ class CalendarResource(ModelResource):
         return event_resource.dispatch('list', request, **kwargs)
 
     def dispatch_rule_list(self, request, **kwargs):
+        cal_pk = kwargs.pop('pk')
         rule_resource = RRuleResource()
-        kwargs['calendar__id'] = kwargs.pop('pk')
+        rule_resource.parent_calendar = {'pk': cal_pk, }
+
+        kwargs['calendar__id'] = cal_pk
         return rule_resource.dispatch('list', request, **kwargs)
 
 

@@ -84,12 +84,15 @@
 
 			select: function(start, end, allDay) {
 				reset_form();
-				prep_form({start: start, end: end, title: "Class"});
+				prep_form({start: start, end: end, all_day: allDay, title: "Class"});
 				$('#eventModal').modal('show');
 
 				calendar.fullCalendar('unselect');
 			},
 			eventClick: function( event, jsEvent, view ) {
+				if (event.repeat) {
+					var retVal = confirm("Do you want to continue ?");
+				}
 				reset_form();
 				prep_form(event);
 				$('#eventModal').modal('show');
@@ -288,7 +291,7 @@
 												<input type="text" class="form-control datefield" id="until" name="until" />
 											</div>
 											<label class="radio-inline">
-												<input type="radio" name="stopRepeatType" id="stopuntil" value="until" checked />Until
+												<input type="radio" name="stopRepeatType" id="stop_until" value="until" checked />Until
 											</label>
 										</div>
 										<div class="form-inline">
@@ -296,7 +299,7 @@
 												<input type="text" class="form-control" id="count" name="count" />
 											</div>
 											<label class="radio-inline">
-												<input type="radio" name="stopRepeatType" id="stopafter" value="count" />After # occurrences
+												<input type="radio" name="stopRepeatType" id="stop_count" value="count" />After # occurrences
 											</label>
 										</div>
 									</div>

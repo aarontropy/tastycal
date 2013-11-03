@@ -132,7 +132,7 @@ class RRule(models.Model):
             if not self.all_day and self.end is not None:
                 delta = self.end - self.start
             else:
-                delta = 0
+                delta = timedelta(0)
 
             print rrule_params
             evs = rrule.rrule(dtstart=self.start, **rrule_params)
@@ -203,11 +203,6 @@ class Event(models.Model):
         print self.end
 
     def delete(self, *args, **kwargs):
-        # if this is the last event connected to a rule, delete the rule
-        if self.rule is not None and len(self.rule.events.all())==1:
-            self.rule.delete()
-            self.rule = None
-
         super(Event, self).delete(*args, **kwargs)
 
 
