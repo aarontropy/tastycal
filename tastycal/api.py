@@ -10,7 +10,8 @@ from datetime import datetime
 
 from models import Calendar, Event, RRule
 
-
+#TODO:
+# 1. Separate RRule resource from Event Resource
 
 #===============================================================================
 class EventResource(ModelResource):
@@ -37,6 +38,11 @@ class EventResource(ModelResource):
         }
 
 
+    def alter_deserialized_detail_data(self, request, data):
+        if getattr(self, 'parent_calendar', None):
+            data['calendar'] = self.parent_calendar
+        return data
+
     def build_filters(self, filters=None): 
         '''
         Currently, some clients (like arshaw's FullCalendar) send time 
@@ -59,83 +65,59 @@ class EventResource(ModelResource):
         return orm_filters 
 
 
-    def obj_create(self, bundle, request=None, **kwargs):
-        # If we are creating a rule instead of an object, create the rule (which
-        # automatically generates a list of events), and return the first event
-        # in the series.
-        if 'repeating' in bundle.data and bundle.data['repeating']:
-            rule_resource = RRuleResource()
-            bundle.obj = rule_resource._meta.object_class()
-            for key, value in kwargs.items():
-                setattr(bundle.obj, key, value)
-            bundle = rule_resource.full_hydrate(bundle)
-            rule_resource.save(bundle)
+    # def obj_update(self, bundle, request=None, **kwargs):
+    #     """
+    #     obj_update takes care of four scenarios:
+    #     1. Non-repeating event (update Event)
+    #     2. Repeating event (update RRule)
+    #     3. Switch from non-repeating to repeating (delete Event, create RRule)
+    #     4. Switch from repeating to non-repeating (delete RRule, create Event)
 
-            bundle.obj.generate_events()
-            bundle.obj = bundle.obj.events.all().order_by('start')[0]
-        else:
-            bundle.obj = self._meta.object_class()
-            for key, value in kwargs.items():
-                setattr(bundle.obj, key, value)
+    #     Client will PUT/PATCH to the Event detail uri, not the RRule one,
+    #     so kwargs[``pk``] will always be for the Event
 
-            bundle = self.full_hydrate(bundle)
-            self.save(bundle)
+    #     """
 
-        return bundle
+    #     is_repeating = 'repeating' in bundle.data and bundle.data['repeating']
+    #     was_repeating = bundle.data.get('rule_id', None) is not None
 
-    def obj_update(self, bundle, request=None, **kwargs):
-        """
-        obj_update takes care of four scenarios:
-        1. Non-repeating event (update Event)
-        2. Repeating event (update RRule)
-        3. Switch from non-repeating to repeating (delete Event, create RRule)
-        4. Switch from repeating to non-repeating (delete RRule, create Event)
+    #     # 1. Non-repeatng event
+    #     if not is_repeating and not was_repeating:
+    #         try:
+    #             bundle.obj = Event.objects.get(pk=int(kwargs['pk']))
+    #         except KeyError:
+    #             raise NotFound('Event not found')
+    #         bundle = self.full_hydrate(bundle)
+    #         self.save(bundle)
 
-        Client will PUT/PATCH to the Event detail uri, not the RRule one,
-        so kwargs[``pk``] will always be for the Event
-
-        """
-
-        is_repeating = 'repeating' in bundle.data and bundle.data['repeating']
-        was_repeating = bundle.data.get('rule_id', None) is not None
-
-        # 1. Non-repeatng event
-        if not is_repeating and not was_repeating:
-            try:
-                bundle.obj = Event.objects.get(pk=int(kwargs['pk']))
-            except KeyError:
-                raise NotFound('Event not found')
-            bundle = self.full_hydrate(bundle)
-            self.save(bundle)
-
-        # 2. Repeating event
-        elif is_repeating and was_repeating:
-            try:
-                event = Event.objects.get(pk=int(kwargs['pk']))
-                bundle.obj = RRule.objects.get(pk=int(bundle.data['rule_id']))
-            except KeyError:
-                raise NotFound('Event not found')
-            bundle = self.full_hydrate(bundle)
-            self.save(bundle)
-            bundle.obj = event
+    #     # 2. Repeating event
+    #     elif is_repeating and was_repeating:
+    #         try:
+    #             event = Event.objects.get(pk=int(kwargs['pk']))
+    #             bundle.obj = RRule.objects.get(pk=int(bundle.data['rule_id']))
+    #         except KeyError:
+    #             raise NotFound('Event not found')
+    #         bundle = self.full_hydrate(bundle)
+    #         self.save(bundle)
+    #         bundle.obj = event
             
-        # 3. Switch from non-repeating to repeating
-        elif is_repeating and not was_repeating:
-            ev = Event.objects.get(pk=int(kwargs['pk']))
-            ev.delete()
+    #     # 3. Switch from non-repeating to repeating
+    #     elif is_repeating and not was_repeating:
+    #         ev = Event.objects.get(pk=int(kwargs['pk']))
+    #         ev.delete()
 
-            rule_resource = RRuleResource()
-            bundle = rule_resource.obj_create(bundle, request, **kwargs)
+    #         rule_resource = RRuleResource()
+    #         bundle = rule_resource.obj_create(bundle, request, **kwargs)
 
-        # 4. Switch from repeating to non-repeating
-        elif not is_repeating and was_repeating:
-            ev = Event.objects.get(pk=int(kwargs['pk']))
-            ev.rule.delete()
+    #     # 4. Switch from repeating to non-repeating
+    #     elif not is_repeating and was_repeating:
+    #         ev = Event.objects.get(pk=int(kwargs['pk']))
+    #         ev.rule.delete()
 
-            bundle = self.obj_create(bundle, request, **kwargs)
+    #         bundle = self.obj_create(bundle, request, **kwargs)
 
-        return bundle
-        # The event is repeating and it
+    #     return bundle
+    #     # The event is repeating and it
 
 
 
@@ -152,11 +134,21 @@ class RRuleResource(ModelResource):
         authorization = DjangoAuthorization()
 
 
+    def obj_create(self, bundle, request=None, **kwargs):
+        """
+        Repeating events are persisted as soon as the rule is created
+        so, in addition to creating the event, the resource must generate
+        a list of events associated with the rule.
+        """
+        bundle = super(RRuleResource, self).obj_create(bundle, request, **kwargs)
+        bundle.obj.generate_events()
+        return bundle
+
 
 #===============================================================================
 class CalendarResource(ModelResource):
-    events = fields.ToManyField(EventResource, 'events')
-    rules = fields.ToManyField(RRuleResource, 'rules')
+    events = fields.ToManyField(EventResource, 'events', null=True)
+    rules = fields.ToManyField(RRuleResource, 'rules', null=True)
 
     #===========================================================================
     class Meta:
@@ -178,9 +170,13 @@ class CalendarResource(ModelResource):
                 name="api_dispatch_rule_list"),
         ]
 
+    # def alter_deserialized_detail_data(self, request, data):
     def dispatch_event_list(self, request, **kwargs):
+        cal_pk = kwargs.pop('pk')
         event_resource = EventResource()
-        kwargs['calendar__id'] = kwargs.pop('pk')
+        event_resource.parent_calendar = {'pk': cal_pk, }
+
+        kwargs['calendar__id'] = cal_pk
         return event_resource.dispatch('list', request, **kwargs)
 
     def dispatch_rule_list(self, request, **kwargs):

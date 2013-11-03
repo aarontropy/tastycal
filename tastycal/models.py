@@ -199,12 +199,11 @@ class Event(models.Model):
             self.all_day = True
 
         super(Event, self).save(*args, **kwargs)
+        print self.start
+        print self.end
 
     def delete(self, *args, **kwargs):
         # if this is the last event connected to a rule, delete the rule
-        print "DELETE"
-        print self.rule
-        print len(self.rule.events.all())
         if self.rule is not None and len(self.rule.events.all())==1:
             self.rule.delete()
             self.rule = None

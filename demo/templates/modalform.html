@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
+<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.1/css/bootstrap.min.css" rel="stylesheet">
+<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.0/themes/base/jquery-ui.css" rel="stylesheet" type="text/css" />
 <link href='http://cdnjs.cloudflare.com/ajax/libs/fullcalendar/1.6.4/fullcalendar.css' rel='stylesheet' />
 <link href='http://cdnjs.cloudflare.com/ajax/libs/fullcalendar/1.6.4/fullcalendar.print.css' rel='stylesheet' media='print' />
-<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.1/css/bootstrap.min.css" rel="stylesheet">
-
-<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.0/themes/base/jquery-ui.css" rel="stylesheet" type="text/css" />
-<link href="/static/css/bootstrap-switch.css" rel="stylesheet" type="text/css" />
-<link href="/static/js/datepicker/css/datepicker.css" rel="stylesheet">
-<link href="/static/js/timepicker/css/bootstrap-timepicker.min.css" rel="stylesheet">
-
+<link href="../project_static/js/datepicker/css/datepicker.css" rel="stylesheet">
+<link href="../project_static/js/timepicker/css/bootstrap-timepicker.min.css" rel="stylesheet">
+<!-- <link href="../project_static/js/bootstrap-modal/css/bootstrap-modal-bs3patch.css" rel="stylesheet" />
+<link href="../project_static/js/bootstrap-modal/css/bootstrap-modal.css" rel="stylesheet" /> -->
 
 
 <script src='http://code.jquery.com/jquery-1.9.1.js'></script>
@@ -17,146 +16,165 @@
 <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.1/js/bootstrap.min.js"></script>
 <script src='http://cdnjs.cloudflare.com/ajax/libs/fullcalendar/1.6.4/fullcalendar.min.js'></script>
 
-<script src='/static/js/jquery-ui-timepicker-addon.js'></script>
-<script src='/static/js/jquery-serializeobject.js'></script>
-<script src='/static/js/moment.min.js'></script>
-<script src='/static/js/underscore-min.js'></script>
-<!-- <script src='/static/js/rrule.js'></script> -->
-<script src='/static/js/csrf.js'></script>
-<script src='/static/js/tastycal.js'></script>
-<script src='/static/js/datepicker/js/bootstrap-datepicker.js'></script>
-<script src='/static/js/timepicker/js/bootstrap-timepicker.min.js'></script>
-
-<script>
-
-	var freqs = ["YEARLY","MONTHLY","WEEKLY","DAILY","HOURLY","MINUTELY","SECONDLY"]
-	var calendar_data = {{ calendar_data|safe }}
-
-	
-	function calendar_api(url, type, data) {
-		console.log(url);
-		$.ajax({
-			url: url,
-			type: type,
-			contentType: 'application/json',
-			data: data,
-			dataType: 'json',
-			processData: false,
-
-		}).done(function() { 
-	    	calendar.fullCalendar('refetchEvents');
-		}).fail(function(xhr, textStatus, errorThrown) { 
-			console.log(jQuery.parseJSON( xhr.responseText ));
-			alert('Error in saving event');
-	    }).always(function() { 
-	    	// Do something always
-	    });
-	}
-
-	var calendar;
-	$(document).ready(function() {
-
-		calendar = $('#calendar').fullCalendar({
-		
-			editable: true,
-			selectable: true,
-			selectHelper: true,
-
-			// Two things:
-			// 1)	Tastypie defaults to <field>__exact=<value> when only the field
-			//  	name is passed. Adding the type of filter prevents this.
-			// 2)	We want all events where start is shown in this view, so change
-			//		the endParam to 'start' as well
-			startParam: 'start__gte',
-			endParam: 'start__lte',
-
-			eventSources: [calendar_data.events_uri],
-			
-			eventDrop: function(event, dayDelta, minuteDelta, allDay, revertFunc, jsEvent) {
-				var data = JSON.stringify({
-				    "start": event.start, //new Date(event.start.getTime() + (minutesDiff * 60000)),
-				    "end": event.end, //new Date(event.end.getTime() + (minutesDiff * 60000)),
-				    "id": event.id
-				});
-
-				call_api(event.resource_uri, data, 'PATCH');
-			},
-
-			select: function(start, end, allDay) {
-				reset_form();
-				prep_form({start: start, end: end, title: "Class"});
-				$('#eventModal').modal('show');
-
-				calendar.fullCalendar('unselect');
-			},
-			eventClick: function( event, jsEvent, view ) {
-				reset_form();
-				prep_form(event);
-				$('#eventModal').modal('show');
-			},
-
-			loading: function(bool) {
-				if (bool) $('#loading').show();
-				else $('#loading').hide();
-			},
-			eventDataTransform: function( eventData ) {
-				return eventData;
-			}
-
-			
-		});
-
-		
-		
+<script src='../project_static/js/datepicker/js/bootstrap-datepicker.js'></script>
+<script src='../project_static/js/timepicker/js/bootstrap-timepicker.min.js'></script>
+<script src='../project_static/js/moment.min.js'></script>
+<!-- <script src="../project_static/js/bootstrap-modal/js/bootstrap-modalmanager.js"></script>
+<script src="../project_static/js/bootstrap-modal/js/bootstrap-modal.js"></script>  
+ -->
+<script type="text/javascript">
+$(document).ready(function() {
+	$('.datefield').datepicker();
+	$('.timefield').timepicker({
+		minuteStep: 15,
+        showInputs: false,
+        disableFocus: true
 	});
 
+
+
+	// ---- ALL DAY ------------------------------------------------------------
+	var save_start_time, save_end_time;
+	$('#all_day').on('click', function() {
+		set_all_day($(this).is(':checked'));
+	});
+
+	var set_all_day = function(all_day) {
+		if (all_day) {
+			save_start_time = $('#start_time').val();
+			save_end_time = $('#end_time').val();
+			$('#start_time').val('').prop('disabled', true);
+			$('#end_time').val('').prop('disabled', true);			
+		} else {
+			$('#start_time').val(save_start_time).prop('disabled', false);
+			$('#end_time').val(save_end_time).prop('disabled', false);			
+		}
+	};
+
+	// ---- REPEAT -------------------------------------------------------------
+	$('#repeat').on('click', function() {
+		set_repeat($(this).is(':checked'));
+	});
+	var set_repeat = function(repeat) {	
+		if (repeat) {
+			$('#repeatTabButton').show();
+		} else {
+			$('#repeatTabButton').hide();
+		}
+	};
+
+	// ---- STOP REPEATING -----------------------------------------------------
+	$("input[name='stopRepeatType']").on('click', function() {
+		set_repeat_stop_type();
+	});
+	var set_repeat_stop_type = function() {
+		stoptype = $("input[name='stopRepeatType']:checked").val()
+		if (stoptype=="until") {
+			$('#until').prop('disabled', false);
+			$('#count').prop('disabled', true);
+		} else {
+			$('#until').prop('disabled', true);
+			$('#count').prop('disabled', false);
+		}
+	}
+	// initial
+	set_repeat_stop_type($("input[name='stopRepeatType']").val());
+
+	// ---- BUTTONS ------------------------------------------------------------
+	$('#save').on('click', function(e) {
+		prep_repeat_data();
+	});
+
+	// ---- DATA ---------------------------------------------------------------
+	var prep_event_data = function() {
+		data = {
+			event_id: parseInt($('#event_id').val()),
+			title: $('#title').val(),
+			start: new Date($('input[name="start_date"]').val() + ' ' + $('input[name="start_time"]').val()),
+			end: new Date($('input[name="end_date"]').val() + ' ' + $('input[name="end_time"]').val()),
+			all_day: $('input[name="all_day"]').is(':checked'),
+			repeat: $('input[name="repeat"]').is(':checked')
+		};
+		return data;
+	}
+
+	var prep_repeat_data = function() {
+		var byweekday = []
+		$('input[name="byweekday"]:checked').each(function() {
+			byweekday.push( this.id );
+		})
+
+		data = {
+			repeat_id:  parseInt($('#repeat_id').val()),
+			freq: $('input[name="freq"]:checked').val(),
+			byweekday: byweekday,	
+		}
+
+		stoptype = $("input[name='stopRepeatType']:checked").val()
+		if (stoptype=="until") {
+			data.until = new Date($('#until').val());
+		} else {
+			data.count = parseInt($('#count').val());
+		}
+		return data;
+	};
+
+	var prep_form = function(event, repeat) {
+		// default value for repeat is false
+		repeat = typeof repeat !== 'undefined' ? repeat : false;
+
+		$('#event_id').val(event.event_id);
+		$('#title').val(event.title);
+		$('#start_date').val(moment(event.start).format('MM/DD/YYYY'));
+		$('#end_date').val(moment(event.end).format('MM/DD/YYYY'));
+		if (!event.all_day) {
+			$('#start_time').val(moment(event.start).format('h:mm a') );
+			$('#end_time').val(moment(event.end).format('h:mm a') );
+		}
+		$('#all_day').prop('checked', event.all_day);
+		$('#repeat').prop('checked', event.repeat);
+
+		if (event.repeat) {
+			$('#repeat_id').val(event.rrule.id);
+			$('input[name="freq"]').each( function() {
+				$(this).prop('checked', (event.rrule.freq==$(this).val()));
+			});
+			$('input[name="byweekday"]').each( function() {
+				$(this).prop('checked', (event.rrule.byweekday.indexOf($(this).val()) > -1) );
+			});
+			if ($("input[name='stopRepeatType']:checked").val() == "until") {
+				$('#until').val(moment(event.rrule.until).format('MM/DD/YYYY'));
+			} else {
+				$('#count').val(event.rrule.count);
+			}
+		}
+	};
+
+	var reset_form = function() {
+		$('form').reset();
+	}
+
+
+});
 </script>
+
 <style>
-
-	body {
-		margin-top: 40px;
-		font-size: 14px;
-		font-family: "Lucida Grande",Helvetica,Arial,Verdana,sans-serif;
-		}
-		
-	#calendar_container {
-		text-align: center;
-		}
-
-	#loading {
-		position: absolute;
-		top: 5px;
-		right: 5px;
-		}
-
-	#calendar {
-		width: 900px;
-		margin: 0 auto;
-		}
-
-	.datepicker{z-index:1151;}
-	.bootstrap-timepicker-widget{z-index:1151;}
-	.form-inline .form-group{
-	    margin-left: 0;
-	    margin-right: 0;
-	}
-	#repeatTabButton {
-		display: none;
-	}
-
+.datepicker{z-index:1151;}
+.bootstrap-timepicker-widget{z-index:1151;}
+.form-inline .form-group{
+    margin-left: 0;
+    margin-right: 0;
+}
+#repeatTabButton {
+	/*display: none;*/
+}
 </style>
+
 </head>
+
 <body>
-	<ul>
-		<li><a href="{% url 'api_dispatch_list' resource_name='calendar' api_name='v1' %}">Calendar API</a></li>
-	</ul>
 
-	<div id="calendar_container">
-		<div id='loading' style='display:none'>loading...</div>
-		<div id='calendar'></div>
-	</div>
-
-
+	<button data-toggle="modal" data-target="#eventDialog" class="btn btn-primary">Modal!</button>
 
 	<div class="modal" id="eventModal">
 		<div class="modal-dialog">
@@ -174,8 +192,6 @@
 							<br />
 							<form class="form-horizontal">
 								<input type="hidden" id="event_id" name="event_id" />
-								<input type="hidden" id="event_uri" name="event_uri" />
-
 								<div class="form-group">
 									<label for="title" class="col-xs-2 control-label">Title</label>
 									<div class="col-xs-10">
@@ -235,7 +251,6 @@
 						<div class="tab-pane" id="repeatTab">
 							<form class="form-horizontal">
 								<input type="hidden" id="repeat_id" name="repeat_id" />
-								<input type="hidden" id="repeat_uri" name="repeat_uri" />
 
 								<div class="form-group">
 									<label class="col-xs-2 control-label" for="freq">Repeat every</label>
@@ -309,7 +324,6 @@
 				</div><!-- /.modal-body -->
 
 				<div class="modal-footer">
-					<button type="button" id="delete" class="btn btn-danger">Delete</button>
 					<button type="button" id="close" class="btn btn-default" data-dismiss="modal">Close</button>
 					<button type="button" id="save"  class="btn btn-primary">Save</button>
 				</div>
@@ -317,9 +331,7 @@
 			</div><!-- /.modal-content -->
 		</div><!-- /.modal-dialog -->
 
-	</div><!-- /#eventModal -->
-
+	</div><!-- /#eventDialog -->
 
 
 </body>
-</html>
