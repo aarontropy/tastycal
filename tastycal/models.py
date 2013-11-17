@@ -219,8 +219,11 @@ class Event(models.Model):
         if not self.end:
             self.all_day = True
 
+        # Strip any timezone information from 'start' and 'end'
+        # Timezone must be passed separately.
         self.start = self.start.replace(tzinfo=None)
-        self.end = self.end.replace(tzinfo=None)
+        if self.end:
+            self.end = self.end.replace(tzinfo=None)
 
         super(Event, self).save(*args, **kwargs)
 

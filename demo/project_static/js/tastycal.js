@@ -1,3 +1,16 @@
+
+
+var save_start_time, save_end_time;
+var event_duration = 60;		// end - start in minutes
+var n = moment();
+
+var current = {
+	start: n,
+	end: n.add(60, 'minutes'),
+	duration: 60
+}
+
+
 $(document).ready(function() {
 	
 	$('.datefield').datepicker();
@@ -23,6 +36,28 @@ $(document).ready(function() {
 		set_repeat_stop_type($(this).val());
 	});
 
+	// ---- SAVE START AND END TIMES -------------------------------------------
+	$('#start_date').on('changeDate', function() { update_start(); });
+	$('#start_time').on('change', function(e) { update_start(); });
+	$('#end_date').on('changeDate', function() { update_end(); });
+	$('#end_time').on('change', function(e) { update_end(); });
+
+	var update_start = function() {
+		current.start = moment( $('#start_date').val() + ' ' + $('#start_time').val() )
+		// update end datetime to be start + duration
+		if (current.duration !== undefined) {
+			current.end = moment(current.start).add(current.duration, 'minutes');
+			dehydrate_event_time('end', current.end);
+		}
+	};
+
+	var update_end = function() {
+		current.end = moment( $('#end_date').val() + ' ' + $('#end_time').val() )
+		// update duration
+		current.duration = current.end.diff(current.start, 'minutes');
+		update_duration_text();
+	}
+
 	// ---- BUTTONS ------------------------------------------------------------
 	$('#save').on('click', function(e) {
 		var is_new = ( $('#event_id').val() == '' && $('#repeat_id').val() == '')
@@ -44,7 +79,6 @@ $(document).ready(function() {
 			method = 'PUT';
 		}
 
-		console.log(data_obj);
 		data = JSON.stringify(data_obj)
 		call_api(url, data, method);
     	$('#eventModal').modal('hide')
@@ -63,13 +97,13 @@ $(document).ready(function() {
 
 // -----------------------------------------------------------------------------
 // ---- FORM FUNCTIONS ---------------------------------------------------------
-var save_start_time, save_end_time;
 var set_all_day = function(all_day) {
 	if (all_day) {
 		save_start_time = $('#start_time').val();
 		save_end_time = $('#end_time').val();
 		$('#start_time').val('').prop('disabled', true);
-		$('#end_time').val('').prop('disabled', true);			
+		$('#end_time').val('').prop('disabled', true);	
+		update_duration_text("");
 	} else {
 		$('#start_time').prop('disabled', false);
 		$('#end_time').prop('disabled', false);			
@@ -79,6 +113,7 @@ var set_all_day = function(all_day) {
 		if (save_end_time !== null) {
 			$('#end_time').val(save_end_time);
 		}
+		update_duration_text();
 	}
 };
 
@@ -146,16 +181,21 @@ var prep_repeat_data = function() {
 var prep_form = function(event, repeat) {
 	// default value for repeat is false
 	repeat = typeof repeat !== 'undefined' ? repeat : false;
+	current.start = moment(event.start);
+	current.end = moment(event.end);
+	current.duration = current.end.diff(current.start, 'minutes');
 
 	$('#event_id').val(event.event_id);
 	$('#event_uri').val(event.resource_uri);
 	$('#title').val(event.title);
-	$('#start_date').val(moment(event.start).format('MM/DD/YYYY'));
-	$('#end_date').val(event.end ? moment(event.end).format('MM/DD/YYYY') : "");
-	if (!event.allDay) {
-		$('#start_time').timepicker('setTime', moment(event.start).format('h:mm A').toString() );
-		$('#end_time').val(event.end ? moment(event.end).format('h:mm A') : "" );
-	}
+	dehydrate_event_time('start', current.start);
+	dehydrate_event_time('end', current.end);
+	// $('#start_date').val(moment(event.start).format('MM/DD/YYYY'));
+	// $('#end_date').val(event.end ? moment(event.end).format('MM/DD/YYYY') : "");
+	// if (!event.allDay) {
+	// 	$('#start_time').val(moment(event.start).format('h:mm A') );
+	// 	$('#end_time').val(event.end ? moment(event.end).format('h:mm A') : "" );
+	// }
 	$('#all_day').prop('checked', event.all_day);
 	$('#repeat').prop('checked', event.repeat);
 
@@ -190,6 +230,36 @@ var reset_form = function() {
 	save_end_time = null;
 };
 
+var dehydrate_event_time = function(start_end, m) {
+	$('#'+start_end+'_date').val(m ? m.format('MM/DD/YYYY') : "");
+	$('#'+start_end+'_time').val(m ? m.format('h:mm A') : "");
+}
+
+var update_duration_text = function(duration_text) {
+
+	var s = '';
+	if (duration_text !== undefined ) {
+		s = duration_text;
+	} else if ($('#all_day').is(':checked')) {
+		s = '';
+	} else {
+		d = moment.duration(current.duration, 'minutes');
+		if (d.days() > 0) { s += ( (s != '') ? ', ' : '' ) + d.days() + ' Day(s)'; }
+		if (d.hours() > 0) {  s += ( (s != '') ? ', ' : '' ) + d.hours() + ' Hour(s)'; }
+		if (d.minutes() > 0) { s += ( (s != '') ? ', ' : '' ) + d.minutes() + ' Minute(s)'; }
+		if (s != '') {
+			s = 'Duration: ' + s;
+		} else {
+			s = 'No time at all';
+		}
+	}
+	$('#duration-label').html(s);
+}
+
+
+var print_event = function() {
+	console.log("start: " + current.start.toString() + " end: " + current.end.toString() + "duration: " + current.duration);
+}
 
 // ---- API FUNCTIONS ----------------------------------------------------------
 var call_api = function(url, data, method) {
@@ -203,7 +273,6 @@ var call_api = function(url, data, method) {
 	if (data !== '') {
 		c_obj.data = data;
 	}
-	console.log(c_obj);
 	$.ajax( c_obj
 	).done(function() { 
 		calendar.fullCalendar('refetchEvents');
