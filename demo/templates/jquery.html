@@ -75,9 +75,8 @@
 			
 			eventDrop: function(event, dayDelta, minuteDelta, allDay, revertFunc, jsEvent) {
 				var data = JSON.stringify({
-				    "start": event.start, //new Date(event.start.getTime() + (minutesDiff * 60000)),
-				    "end": event.end, //new Date(event.end.getTime() + (minutesDiff * 60000)),
-				    "id": event.id
+				    "start": moment(event.start).toString(), //new Date(event.start.getTime() + (minutesDiff * 60000)),
+				    "end": moment(event.end).toString() //new Date(event.end.getTime() + (minutesDiff * 60000)),
 				});
 
 				call_api(event.resource_uri, data, 'PATCH');
