@@ -7,7 +7,7 @@ var n = moment();
 var current = {
 	start: n,
 	end: n.add(60, 'minutes'),
-	duration: 60
+	duration: moment.duration(60, 'minutes')
 }
 
 
@@ -38,15 +38,15 @@ $(document).ready(function() {
 
 	// ---- SAVE START AND END TIMES -------------------------------------------
 	$('#start_date').on('changeDate', function() { update_start(); });
-	$('#start_time').on('change', function(e) { update_start(); });
+	$('#start_time').on('change', function() { update_start(); });
 	$('#end_date').on('changeDate', function() { update_end(); });
-	$('#end_time').on('change', function(e) { update_end(); });
+	$('#end_time').on('change', function() { update_end(); });
 
 	var update_start = function() {
 		current.start = moment( $('#start_date').val() + ' ' + $('#start_time').val() )
 		// update end datetime to be start + duration
-		if (current.duration !== undefined) {
-			current.end = moment(current.start).add(current.duration, 'minutes');
+		if (current.duration != null) {
+			current.end = moment(current.start).add(current.duration);
 			dehydrate_event_time('end', current.end);
 		}
 	};
@@ -54,7 +54,7 @@ $(document).ready(function() {
 	var update_end = function() {
 		current.end = moment( $('#end_date').val() + ' ' + $('#end_time').val() )
 		// update duration
-		current.duration = current.end.diff(current.start, 'minutes');
+		current.duration = moment.duration(current.end.diff(current.start));
 		update_duration_text();
 	}
 
@@ -183,7 +183,7 @@ var prep_form = function(event, repeat) {
 	repeat = typeof repeat !== 'undefined' ? repeat : false;
 	current.start = moment(event.start);
 	current.end = moment(event.end);
-	current.duration = current.end.diff(current.start, 'minutes');
+	current.duration = moment.duration(current.end.diff(current.start));
 
 	$('#event_id').val(event.event_id);
 	$('#event_uri').val(event.resource_uri);
@@ -243,7 +243,7 @@ var update_duration_text = function(duration_text) {
 	} else if ($('#all_day').is(':checked')) {
 		s = '';
 	} else {
-		d = moment.duration(current.duration, 'minutes');
+		d = current.duration;
 		if (d.days() > 0) { s += ( (s != '') ? ', ' : '' ) + d.days() + ' Day(s)'; }
 		if (d.hours() > 0) {  s += ( (s != '') ? ', ' : '' ) + d.hours() + ' Hour(s)'; }
 		if (d.minutes() > 0) { s += ( (s != '') ? ', ' : '' ) + d.minutes() + ' Minute(s)'; }
@@ -257,9 +257,6 @@ var update_duration_text = function(duration_text) {
 }
 
 
-var print_event = function() {
-	console.log("start: " + current.start.toString() + " end: " + current.end.toString() + "duration: " + current.duration);
-}
 
 // ---- API FUNCTIONS ----------------------------------------------------------
 var call_api = function(url, data, method) {

@@ -97,6 +97,9 @@
 				if (event.repeat) {
 					var retVal = confirm("Do you want to continue ?");
 				}
+				if (event.end == null) {
+					event.end = event.start;
+				}
 				reset_form();
 				prep_form(event);
 				$('#eventModal').modal('show');
