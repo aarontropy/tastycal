@@ -66,18 +66,27 @@ $(document).ready(function() {
 		var url, data, data_obj, method;
 
 		if (is_repeat) {
-			url = calendar_data.repeats_uri;
 			data_obj = prep_repeat_data();
+			if (is_new) {
+				url = calendar_data.repeats_uri;
+				method = 'POST';
+			} else {
+				url = $('#repeat_uri').val();
+				method = 'PUT';
+			}
 		} else {
-			url = calendar_data.events_uri;
 			data_obj = prep_event_data();
+			if (is_new) {
+				url = calendar_data.events_uri;
+				method = 'POST';
+			} else {
+				url = $('#event_uri').val();
+				method = 'PUT';
+			}
 		}
 
-		if (is_new) {
-			method = 'POST';
-		} else {
-			method = 'PUT';
-		}
+
+		console.log(data_obj);
 
 		data = JSON.stringify(data_obj)
 		call_api(url, data, method);
@@ -99,20 +108,14 @@ $(document).ready(function() {
 // ---- FORM FUNCTIONS ---------------------------------------------------------
 var set_all_day = function(all_day) {
 	if (all_day) {
-		save_start_time = $('#start_time').val();
-		save_end_time = $('#end_time').val();
 		$('#start_time').val('').prop('disabled', true);
 		$('#end_time').val('').prop('disabled', true);	
 		update_duration_text("");
 	} else {
+		dehydrate_event_time('start', current.start);
+		dehydrate_event_time('end', current.end);
 		$('#start_time').prop('disabled', false);
 		$('#end_time').prop('disabled', false);			
-		if (save_start_time !== null) {
-			$('#start_time').val(save_start_time);
-		}
-		if (save_end_time !== null) {
-			$('#end_time').val(save_end_time);
-		}
 		update_duration_text();
 	}
 };
@@ -143,10 +146,10 @@ var prep_event_data = function() {
 		start: moment($('input[name="start_date"]').val() + ' ' + $('input[name="start_time"]').val()).toString(),
 		end: moment($('input[name="end_date"]').val() + ' ' + $('input[name="end_time"]').val()).toString(),
 		all_day: $('input[name="all_day"]').is(':checked'),
-		repeat: $('input[name="repeat"]').is(':checked'),
+		repeat: $('input[name="repeat"]').is(':checked')
 	};
 	if (!isNaN($('#event_id').val())) {
-		id: parseInt($('#event_id').val());
+		data.id = parseInt($('#event_id').val());
 	}
 	return data;
 }
@@ -181,11 +184,12 @@ var prep_repeat_data = function() {
 var prep_form = function(event, repeat) {
 	// default value for repeat is false
 	repeat = typeof repeat !== 'undefined' ? repeat : false;
+
 	current.start = moment(event.start);
 	current.end = moment(event.end);
 	current.duration = moment.duration(current.end.diff(current.start));
 
-	$('#event_id').val(event.event_id);
+	$('#event_id').val(event.id);
 	$('#event_uri').val(event.resource_uri);
 	$('#title').val(event.title);
 	dehydrate_event_time('start', current.start);
@@ -196,7 +200,7 @@ var prep_form = function(event, repeat) {
 	// 	$('#start_time').val(moment(event.start).format('h:mm A') );
 	// 	$('#end_time').val(event.end ? moment(event.end).format('h:mm A') : "" );
 	// }
-	$('#all_day').prop('checked', event.all_day);
+	$('#all_day').prop('checked', event.allDay);
 	$('#repeat').prop('checked', event.repeat);
 
 	if (event.repeat) {
