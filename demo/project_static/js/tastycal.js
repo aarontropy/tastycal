@@ -113,7 +113,6 @@ var prep_event_data = function() {
 	if (!isNaN($('#event_id').val())) {
 		id: parseInt($('#event_id').val());
 	}
-	console.log($('input[name="start_date"]').val() + ' ' + $('input[name="start_time"]').val());
 	return data;
 }
 
@@ -147,8 +146,6 @@ var prep_repeat_data = function() {
 var prep_form = function(event, repeat) {
 	// default value for repeat is false
 	repeat = typeof repeat !== 'undefined' ? repeat : false;
-
-	console.log(event);
 
 	$('#event_id').val(event.event_id);
 	$('#event_uri').val(event.resource_uri);

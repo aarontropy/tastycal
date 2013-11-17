@@ -1,12 +1,14 @@
 from tastypie.resources import ModelResource, ALL_WITH_RELATIONS, ALL
 from tastypie import fields
 from tastypie.utils import trailing_slash
-from tastypie.authorization import DjangoAuthorization
+from tastypie.authorization import DjangoAuthorization, Authorization
+from tastypie.authentication import Authentication
 from django.conf.urls import url
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import json
 import pytz
 from datetime import datetime
+from dateutil.parser import parse
 
 from models import Calendar, Event, RRule
 
@@ -27,10 +29,12 @@ class EventResource(ModelResource):
 
     #===========================================================================
     class Meta:
+        allowed_methods = ['get', 'post', 'put', 'patch', 'delete']
         queryset = Event.objects.all()
         resource_name = 'event'
         collection_name = 'events'
-        authorization = DjangoAuthorization()
+        authorization = Authorization()
+        authentication = Authentication()
         filtering = {
             'calendar': ALL_WITH_RELATIONS,
             'start': ALL,
@@ -48,6 +52,7 @@ class EventResource(ModelResource):
         bundle.data['repeat'] = bundle.obj.rule is not None
         bundle.data['allDay'] = bundle.data.pop('all_day')
         return bundle
+
 
     def build_filters(self, filters=None): 
         '''
@@ -71,61 +76,7 @@ class EventResource(ModelResource):
         return orm_filters 
 
 
-    # def obj_update(self, bundle, request=None, **kwargs):
-    #     """
-    #     obj_update takes care of four scenarios:
-    #     1. Non-repeating event (update Event)
-    #     2. Repeating event (update RRule)
-    #     3. Switch from non-repeating to repeating (delete Event, create RRule)
-    #     4. Switch from repeating to non-repeating (delete RRule, create Event)
-
-    #     Client will PUT/PATCH to the Event detail uri, not the RRule one,
-    #     so kwargs[``pk``] will always be for the Event
-
-    #     """
-
-    #     is_repeating = 'repeating' in bundle.data and bundle.data['repeating']
-    #     was_repeating = bundle.data.get('rule_id', None) is not None
-
-    #     # 1. Non-repeatng event
-    #     if not is_repeating and not was_repeating:
-    #         try:
-    #             bundle.obj = Event.objects.get(pk=int(kwargs['pk']))
-    #         except KeyError:
-    #             raise NotFound('Event not found')
-    #         bundle = self.full_hydrate(bundle)
-    #         self.save(bundle)
-
-    #     # 2. Repeating event
-    #     elif is_repeating and was_repeating:
-    #         try:
-    #             event = Event.objects.get(pk=int(kwargs['pk']))
-    #             bundle.obj = RRule.objects.get(pk=int(bundle.data['rule_id']))
-    #         except KeyError:
-    #             raise NotFound('Event not found')
-    #         bundle = self.full_hydrate(bundle)
-    #         self.save(bundle)
-    #         bundle.obj = event
-            
-    #     # 3. Switch from non-repeating to repeating
-    #     elif is_repeating and not was_repeating:
-    #         ev = Event.objects.get(pk=int(kwargs['pk']))
-    #         ev.delete()
-
-    #         rule_resource = RRuleResource()
-    #         bundle = rule_resource.obj_create(bundle, request, **kwargs)
-
-    #     # 4. Switch from repeating to non-repeating
-    #     elif not is_repeating and was_repeating:
-    #         ev = Event.objects.get(pk=int(kwargs['pk']))
-    #         ev.rule.delete()
-
-    #         bundle = self.obj_create(bundle, request, **kwargs)
-
-    #     return bundle
-    #     # The event is repeating and it
-
-
+ 
 
 #===============================================================================
 class RRuleResource(ModelResource):
@@ -137,7 +88,8 @@ class RRuleResource(ModelResource):
         queryset = RRule.objects.all()
         resource_name = 'rrule'
         collection_name = 'rrules'
-        authorization = DjangoAuthorization()
+        authorization = Authorization()
+        authentication = Authentication()
 
 
     def alter_deserialized_detail_data(self, request, data):
@@ -166,7 +118,8 @@ class CalendarResource(ModelResource):
         queryset = Calendar.objects.all()
         resource_name = 'calendar'
         collection_name = 'calendars'
-        authorization = DjangoAuthorization()
+        authorization = Authorization()
+        authentication= Authentication()
         filtering = {
             'id': ALL,
         }

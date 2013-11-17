@@ -10,7 +10,8 @@ from django.conf import settings
 
 from dateutil import rrule
 
-from fields import RRuleWeekdayListField
+from fields import IntegerListField
+from tastycal.timezone_field import TimeZoneField
 
 
 #===============================================================================
@@ -69,6 +70,15 @@ class RRule(models.Model):
     capable of generating a set of events
 
     '''
+    (
+    YEARLY,
+    MONTHLY,
+    WEEKLY,
+    DAILY,
+    HOURLY,
+    MINUTELY,
+    SECONDLY) = list(range(7))
+
     WEEKDAYS = (
         (0,'MO'),
         (1,'TU'),
@@ -80,28 +90,41 @@ class RRule(models.Model):
     )
     calendar = models.ForeignKey(Calendar, related_name="rules")
 
-    title = models.CharField(_('title'), max_length=100)
-    start = models.DateTimeField(_('start time'))
+    # Default Repeating Event Information
+    title = models.CharField(_('title'), max_length=100)            
+    duration = models.PositiveIntegerField(blank=True, null=True, default=0)   # Duration of event in minutes
+
     end = models.DateTimeField(_('end time'), null=True, blank=True)
     all_day = models.BooleanField(_('all day'), default=False)
+    timezone = TimeZoneField(null=True)
 
+    # RRule parameters
+    dtstart = models.DateTimeField(_('dtstart'))
     freq = models.PositiveIntegerField(default=rrule.WEEKLY, blank=True)
-    until = models.DateTimeField(blank=True, null=True)
-    count = models.PositiveIntegerField(blank=True)
     interval = models.PositiveIntegerField(default=1)
+    count = models.PositiveIntegerField(blank=True)
+    until = models.DateTimeField(blank=True, null=True)
     wkst = models.PositiveIntegerField(choices=WEEKDAYS, default=0)
-    byweekday = RRuleWeekdayListField(blank=True)
+    byweekday = IntegerListField(blank=True, null=True)
 
 
     #===========================================================================
     class Meta:
         verbose_name = _('recurrence rule')
         verbose_name_plural = _('recurrence rules')
+
+    def __init__(self, *args, **kwargs):
+        super(RRule, self).__init__(*args, **kwargs)
+        self._rrule = None
         
 
     def __unicode__(self):
         return "Event rule for %s" % self.calendar.title
 
+
+    def save(self, *args, **kwargs):
+        super(RRule, self).save(*args, **kwargs)
+        self.generate_events()
 
 
     def delete(self, *args, **kwargs):
@@ -113,40 +136,37 @@ class RRule(models.Model):
             ev.delete()
         super(RRule, self).delete(*args, **kwargs)
 
+    def get_rrule(self):
+        if self._rrule is None:
+            # if it isn't cached, create it
+            params = model_to_dict(self, fields=['dtstart', 'freq','until','count','interval','wkst','byweekday']) 
+            params['wkst'] = rrule.weekday(params['wkst'])
+            if len(self.byweekday) == 0:
+                params.pop('byweekday')
+            if not params['count'] and not params['until']:
+                params['count'] = 1
+            self._rrule = rrule.rrule(**params)
+        return self._rrule
+
     def generate_events(self):
         '''
         Creates a set of events based on the model's rrule options
 
         '''
+        events = self.get_rrule()
+
         for ev in self.events.all():
             ev.delete()
 
-        rrule_params = model_to_dict(self, fields=['freq','until','count','interval','wkst','byweekday']) 
-        rrule_params['wkst'] = rrule.weekday(rrule_params['wkst'])
-        if len(self.byweekday) == 0:
-            rrule_params.pop('byweekday')
-
-        if not rrule_params['count'] and not rrule_params['until']:
-            rrule_params['count'] = 1
-        else:
-            if not self.all_day and self.end is not None:
-                delta = self.end - self.start
-            else:
-                delta = timedelta(0)
-
-            print rrule_params
-            evs = rrule.rrule(dtstart=self.start, **rrule_params)
-            for ev in evs:
-                e = Event()
-                e.start = ev
-                e.end = ev + delta if self.end is not None else None
-                e.all_day = self.all_day
-                e.title = self.title
-                e.calendar = self.calendar
-                e.rule = self
-                e.save()
-
-
+        for ev in events:
+            Event.objects.create(
+                start = ev,
+                end = ev + timedelta(minutes=self.duration) if self.duration > 0 else None,
+                all_day = self.all_day,
+                title = self.title,
+                calendar = self.calendar,
+                rule = self,
+            )
 
                 
 
@@ -181,6 +201,7 @@ class Event(models.Model):
     start = models.DateTimeField(_('start time'))
     end = models.DateTimeField(_('end time'), blank=True, null=True)
     all_day = models.BooleanField(_('all day'), default=False)
+    timezone = TimeZoneField(null=True)
 
 
     #===========================================================================
@@ -198,18 +219,19 @@ class Event(models.Model):
         if not self.end:
             self.all_day = True
 
+        self.start = self.start.replace(tzinfo=None)
+        self.end = self.end.replace(tzinfo=None)
+
         super(Event, self).save(*args, **kwargs)
-        print self.start
-        print self.end
-
-    def delete(self, *args, **kwargs):
-        super(Event, self).delete(*args, **kwargs)
 
 
-    @models.permalink
-    def get_absolute_url(self):
-        return ('swingtime-event', [str(self.id)])
 
+
+    def get_start(self):
+        pass
+
+    def get_date(self):
+        pass
 
     def __cmp__(self, other):
         return cmp(self.start, other.start)
