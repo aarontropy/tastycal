@@ -87,7 +87,7 @@
 				if (start.getTime() == end.getTime()) {
 					end = moment(start).add('minutes', 60);
 				}
-				prep_form({start: start, end: end, all_day: allDay, title: "Class"});
+				prep_form({start: start, end: end, allDay: allDay, title: "Class"});
 				$('#eventModal').modal('show');
 
 				calendar.fullCalendar('unselect');

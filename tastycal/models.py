@@ -174,7 +174,7 @@ class RRule(models.Model):
 #===============================================================================
 class EventType(models.Model):
     '''
-    Simple ``Event`` classifcation.
+    Simple ``Event`` classifcation
     
     '''
     abbr = models.CharField(_(u'abbreviation'), max_length=4, unique=True)

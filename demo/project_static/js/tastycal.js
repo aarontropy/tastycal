@@ -155,18 +155,23 @@ var prep_event_data = function() {
 }
 
 var prep_repeat_data = function() {
-	// repeat data has at least all the fields of an event, so start with that
-	// but remove the id, if it exists
-	data = prep_event_data();
-	delete data.id;
 
 	var byweekday = []
 	$('input[name="byweekday"]:checked').each(function() {
 		byweekday.push( this.id );
 	})
 
-	data.freq = parseInt($('input[name="freq"]:checked').val());
-	data.byweekday = byweekday
+	data = {
+		title: $('#title').val(),
+		dtstart: moment($('input[name="start_date"]').val() + ' ' + $('input[name="start_time"]').val()).toString(),
+		end: moment($('input[name="end_date"]').val() + ' ' + $('input[name="end_time"]').val()).toString(),
+		duration: ($('input[name="all_day"]').is(':checked')) ? null : current.duration.minutes(),
+		byweekday: byweekday,
+		freq: parseInt($('input[name="freq"]:checked').val()),
+		all_day: $('input[name="all_day"]').is(':checked'),
+		repeat: $('input[name="repeat"]').is(':checked')
+	};
+
 
 	stoptype = $("input[name='stopRepeatType']:checked").val()
 	if (stoptype=="until") {
@@ -176,7 +181,7 @@ var prep_repeat_data = function() {
 	}
 
 	if (!isNaN($('#repeat_id').val())) {
-		id:  parseInt($('#repeat_id').val());
+		data.id = parseInt($('#repeat_id').val());
 	}
 	return data;
 };
@@ -200,6 +205,7 @@ var prep_form = function(event, repeat) {
 	// 	$('#start_time').val(moment(event.start).format('h:mm A') );
 	// 	$('#end_time').val(event.end ? moment(event.end).format('h:mm A') : "" );
 	// }
+	console.log(event.allDay);
 	$('#all_day').prop('checked', event.allDay);
 	$('#repeat').prop('checked', event.repeat);
 
@@ -247,10 +253,7 @@ var update_duration_text = function(duration_text) {
 	} else if ($('#all_day').is(':checked')) {
 		s = '';
 	} else {
-		d = current.duration;
-		if (d.days() > 0) { s += ( (s != '') ? ', ' : '' ) + d.days() + ' Day(s)'; }
-		if (d.hours() > 0) {  s += ( (s != '') ? ', ' : '' ) + d.hours() + ' Hour(s)'; }
-		if (d.minutes() > 0) { s += ( (s != '') ? ', ' : '' ) + d.minutes() + ' Minute(s)'; }
+		s = humanize_duration(current.duration);
 		if (s != '') {
 			s = 'Duration: ' + s;
 		} else {
@@ -258,6 +261,14 @@ var update_duration_text = function(duration_text) {
 		}
 	}
 	$('#duration-label').html(s);
+}
+
+var humanize_duration = function(d) {
+	var s = '';
+	if (d.days() > 0) { s += ( (s != '') ? ', ' : '' ) + d.days() + ' Day(s)'; }
+	if (d.hours() > 0) {  s += ( (s != '') ? ', ' : '' ) + d.hours() + ' Hour(s)'; }
+	if (d.minutes() > 0) { s += ( (s != '') ? ', ' : '' ) + d.minutes() + ' Minute(s)'; }
+	return s;
 }
 
 

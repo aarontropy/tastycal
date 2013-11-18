@@ -104,7 +104,7 @@ class RRuleResource(ModelResource):
         a list of events associated with the rule.
         """
         bundle = super(RRuleResource, self).obj_create(bundle, **kwargs)
-        bundle.obj.generate_events()
+        # bundle.obj.generate_events()
         return bundle
 
 
