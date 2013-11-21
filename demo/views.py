@@ -5,6 +5,14 @@ import json
 from tastycal.models import Calendar
 from tastycal.api import CalendarResource
 
+def index(request):
+	calendars = Calendar.objects.all()
+	print calendars
+	return render_to_response(
+		'index.html',
+		{'calendars': calendars},
+		context_instance=RequestContext(request))
+
 
 def jquery_view(request, calendar_id):
 	calendar = get_object_or_404(Calendar, id=calendar_id)

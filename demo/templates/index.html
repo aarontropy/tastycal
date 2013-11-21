@@ -4,7 +4,11 @@
 </head>
 <body>
 <ul>
-	<li><a href="/jquery/">Plain Jane Jquery example</a></li>
+    {% for calendar in calendars %}
+	<li><a href="{% url 'jquery_view' calendar.id %}">{{ calendar.title }}</a></li>
+    {% empty %}
+    Yes, we have no calendars today.
+    {% endfor %}
 </ul>
 </body>
 </html>
