@@ -8,6 +8,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
 
+from django.dispatch import receiver
+from django.db.models.signals import post_delete, post_save
+
 from dateutil import rrule
 
 from fields import IntegerListField
@@ -122,9 +125,9 @@ class RRule(models.Model):
         return "Event rule for %s" % self.calendar.title
 
 
-    def save(self, *args, **kwargs):
-        super(RRule, self).save(*args, **kwargs)
-        self.generate_events()
+    # def save(self, *args, **kwargs):
+    #     super(RRule, self).save(*args, **kwargs)
+    #     self.generate_events()
 
 
     def delete(self, *args, **kwargs):
@@ -147,26 +150,7 @@ class RRule(models.Model):
                 params['count'] = 1
             self._rrule = rrule.rrule(**params)
         return self._rrule
-
-    def generate_events(self):
-        '''
-        Creates a set of events based on the model's rrule options
-
-        '''
-        events = self.get_rrule()
-
-        for ev in self.events.all():
-            ev.delete()
-
-        for ev in events:
-            Event.objects.create(
-                start = ev,
-                end = ev + timedelta(minutes=self.duration) if self.duration > 0 else None,
-                all_day = self.all_day,
-                title = self.title,
-                calendar = self.calendar,
-                rule = self,
-            )
+        
 
                 
 
@@ -190,6 +174,27 @@ class EventType(models.Model):
         return self.label
 
 
+class EventManager(models.Manager):
+    def create_events_from_rule(self, rrule):
+        '''
+        Creates a set of events based on the model's rrule options
+
+        '''
+        events = rrule.get_rrule()
+
+        for ev in rrule.events.all():
+            ev.delete()
+
+        for ev in events:
+            print "creating event for rule %d" % rrule.id
+            Event.objects.create(
+                start = ev,
+                end = ev + timedelta(minutes=rrule.duration) if rrule.duration > 0 else None,
+                all_day = rrule.all_day,
+                title = rrule.title,
+                calendar = rrule.calendar,
+                rule = rrule,
+            )
 
 #===============================================================================
 class Event(models.Model):
@@ -202,6 +207,8 @@ class Event(models.Model):
     end = models.DateTimeField(_('end time'), blank=True, null=True)
     all_day = models.BooleanField(_('all day'), default=False)
     timezone = TimeZoneField(null=True)
+
+    objects = EventManager()
 
 
     #===========================================================================
@@ -239,3 +246,15 @@ class Event(models.Model):
     def __cmp__(self, other):
         return cmp(self.start, other.start)
 
+#==== SIGNALS ==================================================================
+@receiver(post_delete, sender=Event)
+def last_event_standing(sender, instance, using, **kwargs):
+    # remember that instance is no longer in the database,
+    # so if instance.rule is not None, AND it is the last event,
+    # instance.rule.events.count() should be 0
+    if instance.rule and instance.rule.events.count() == 0:
+        instance.rule.delete()
+
+@receiver(post_save, sender=RRule)
+def persist_recurring_events(sender, instance, created, raw, using, update_fields, **kwargs):
+    Event.objects.create_events_from_rule(instance)
